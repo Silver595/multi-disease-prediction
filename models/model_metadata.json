@@ -1,0 +1,60 @@
+{
+    "diseases": [
+        "diabetes",
+        "heart_disease",
+        "hypertension",
+        "stroke",
+        "disease_risk"
+    ],
+    "features": [
+        "age",
+        "gender",
+        "bmi",
+        "blood_pressure",
+        "cholesterol",
+        "blood_sugar",
+        "heart_rate",
+        "smoking",
+        "exercise_hours",
+        "family_history"
+    ],
+    "training_date": "2025-10-14 00:38:10",
+    "training_samples": 5922,
+    "results": [
+        {
+            "Disease": "Diabetes",
+            "Accuracy": 0.939,
+            "Precision": 0.7974683544303798,
+            "Recall": 0.9356435643564357,
+            "F1-Score": 0.8610478359908884
+        },
+        {
+            "Disease": "Heart Disease",
+            "Accuracy": 0.946,
+            "Precision": 0.696969696969697,
+            "Recall": 0.8679245283018868,
+            "F1-Score": 0.773109243697479
+        },
+        {
+            "Disease": "Hypertension",
+            "Accuracy": 0.968,
+            "Precision": 0.6805555555555556,
+            "Recall": 0.8448275862068966,
+            "F1-Score": 0.7538461538461538
+        },
+        {
+            "Disease": "Stroke",
+            "Accuracy": 0.957,
+            "Precision": 0.5921052631578947,
+            "Recall": 0.7894736842105263,
+            "F1-Score": 0.6766917293233082
+        },
+        {
+            "Disease": "Disease Risk",
+            "Accuracy": 0.938,
+            "Precision": 0.8535714285714285,
+            "Recall": 0.9192307692307692,
+            "F1-Score": 0.8851851851851852
+        }
+    ]
+}
