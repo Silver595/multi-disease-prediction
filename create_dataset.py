@@ -1,295 +1,255 @@
-# scripts/create_dataset.py
+# create_dataset.py
 """
-Generate a realistic health risk prediction dataset with 5000 samples
+Water Quality Dataset Generator - Northeast India
+Enhanced with realistic correlations
 """
 
 import pandas as pd
 import numpy as np
 import os
+from datetime import datetime, timedelta
+
+print("\n" + "=" * 80)
+print("WATERBORNE DISEASE DATASET GENERATION")
+print("Northeast India - Community Health Monitoring")
+print("=" * 80)
+
+os.makedirs("data", exist_ok=True)
+os.makedirs("data/raw", exist_ok=True)
 
 np.random.seed(42)
+n_samples = 15000  # Increased dataset size
 
+print(f"\nGenerating {n_samples:,} water quality records...")
 
-def generate_large_dataset(n_samples=5000):
-    """Generate comprehensive health risk dataset"""
+# Location data
+states = [
+    "Assam",
+    "Meghalaya",
+    "Tripura",
+    "Nagaland",
+    "Manipur",
+    "Mizoram",
+    "Arunachal Pradesh",
+]
+location_types = ["Rural", "Urban"]
+water_sources = ["River", "Stream", "Well", "Hand Pump", "Pond", "Spring"]
+seasons = ["Monsoon", "Pre-Monsoon", "Post-Monsoon", "Winter"]
 
-    print(f"Generating {n_samples} patient records...")
+# Generate with realistic distributions
+data = {
+    "state": np.random.choice(
+        states, n_samples, p=[0.30, 0.15, 0.12, 0.10, 0.10, 0.08, 0.15]
+    ),
+    "location_type": np.random.choice(location_types, n_samples, p=[0.85, 0.15]),
+    "water_source": np.random.choice(
+        water_sources, n_samples, p=[0.20, 0.15, 0.15, 0.20, 0.15, 0.15]
+    ),
+    "season": np.random.choice(seasons, n_samples, p=[0.35, 0.25, 0.25, 0.15]),
+}
 
-    # Demographics
-    age = np.random.randint(18, 90, n_samples)
-    gender = np.random.randint(0, 2, n_samples)  # 0=Female, 1=Male
+df = pd.DataFrame(data)
 
-    # Anthropometric measurements
-    height_cm = np.where(
-        gender == 1,
-        np.random.normal(175, 7, n_samples),  # Male
-        np.random.normal(162, 6, n_samples),
-    )  # Female
+print("  Generating water quality parameters...")
 
-    weight_kg = np.where(
-        gender == 1,
-        np.random.normal(80, 15, n_samples),  # Male
-        np.random.normal(65, 12, n_samples),
-    )  # Female
+# pH (WHO: 6.5-8.5)
+ph_base = np.random.normal(7.0, 0.8, n_samples)
+df["ph"] = np.clip(ph_base - (df["season"] == "Monsoon") * 0.4, 5.0, 9.0)
 
-    bmi = weight_kg / ((height_cm / 100) ** 2)
-    bmi = np.clip(bmi, 15, 50)
+# Turbidity (India: <10 NTU)
+turbidity_base = np.random.exponential(7, n_samples)
+df["turbidity_ntu"] = np.where(
+    df["season"] == "Monsoon", turbidity_base * 2.5, turbidity_base
+)
+df["turbidity_ntu"] = np.clip(df["turbidity_ntu"], 0.1, 120)
 
-    # Vital signs (age and BMI dependent)
-    blood_pressure_systolic = (
-        110 + (age * 0.3) + (bmi * 0.9) + np.random.normal(0, 12, n_samples)
-    )
-    blood_pressure_systolic = np.clip(blood_pressure_systolic, 90, 220).astype(int)
+# TDS (India: <500 mg/L)
+df["tds_mg_l"] = np.clip(np.random.normal(350, 140, n_samples), 50, 1200)
 
-    blood_pressure_diastolic = (
-        70 + (age * 0.15) + (bmi * 0.5) + np.random.normal(0, 8, n_samples)
-    )
-    blood_pressure_diastolic = np.clip(blood_pressure_diastolic, 60, 130).astype(int)
+# Dissolved Oxygen (Good: >5 mg/L)
+do_base = np.where(
+    df["water_source"].isin(["Stream", "Spring"]),
+    np.random.normal(7.5, 1.5, n_samples),
+    np.random.normal(5.5, 2.0, n_samples),
+)
+df["dissolved_oxygen_mg_l"] = np.clip(do_base, 1.0, 12.0)
 
-    # Blood chemistry
-    cholesterol_total = (
-        160 + (age * 0.6) + (bmi * 1.5) + np.random.normal(0, 25, n_samples)
-    )
-    cholesterol_total = np.clip(cholesterol_total, 120, 400).astype(int)
+# BOD (Good: <3 mg/L)
+bod_base = np.random.exponential(2.8, n_samples)
+df["bod_mg_l"] = np.where(df["location_type"] == "Urban", bod_base * 1.5, bod_base)
+df["bod_mg_l"] = np.clip(df["bod_mg_l"], 0.5, 18)
 
-    cholesterol_ldl = cholesterol_total * np.random.uniform(0.5, 0.7, n_samples)
-    cholesterol_ldl = np.clip(cholesterol_ldl, 50, 300).astype(int)
+# Fecal Coliform (India: <10 MPN/100ml)
+fecal_base = np.random.exponential(35, n_samples)
+df["fecal_coliform_mpn"] = np.where(
+    df["water_source"] == "Pond",
+    fecal_base * 3,
+    np.where(df["season"] == "Monsoon", fecal_base * 2, fecal_base),
+)
+df["fecal_coliform_mpn"] = np.clip(df["fecal_coliform_mpn"], 0, 800)
 
-    cholesterol_hdl = np.where(
-        gender == 1,
-        np.random.normal(45, 10, n_samples),  # Male
-        np.random.normal(55, 12, n_samples),
-    )  # Female
-    cholesterol_hdl = np.clip(cholesterol_hdl, 20, 100).astype(int)
+# Total Coliform
+df["total_coliform_mpn"] = df["fecal_coliform_mpn"] * np.random.uniform(
+    2.0, 3.5, n_samples
+)
+df["total_coliform_mpn"] = np.clip(df["total_coliform_mpn"], 0, 2000)
 
-    triglycerides = (
-        100 + (bmi - 22) * 6 + (age * 0.6) + np.random.normal(0, 40, n_samples)
-    )
-    triglycerides = np.clip(triglycerides, 40, 500).astype(int)
+# Nitrate (WHO: <50 mg/L)
+df["nitrate_mg_l"] = np.clip(np.random.exponential(11, n_samples), 0, 60)
 
-    # Glucose metabolism
-    blood_sugar_fasting = (
-        85 + (age * 0.25) + (bmi * 1.0) + np.random.normal(0, 18, n_samples)
-    )
-    blood_sugar_fasting = np.clip(blood_sugar_fasting, 65, 300).astype(int)
+# Fluoride (India: <1.0 mg/L)
+df["fluoride_mg_l"] = np.clip(np.random.exponential(0.55, n_samples), 0, 3.5)
 
-    hba1c = (
-        5.0 + (blood_sugar_fasting - 90) * 0.025 + np.random.normal(0, 0.6, n_samples)
-    )
-    hba1c = np.clip(hba1c, 4.0, 14.0)
+# Chloride (WHO: <250 mg/L)
+df["chloride_mg_l"] = np.clip(np.random.normal(38, 32, n_samples), 5, 220)
 
-    # Cardiac
-    heart_rate = np.random.normal(72, 11, n_samples)
-    heart_rate = np.clip(heart_rate, 45, 130).astype(int)
+# Hardness
+df["hardness_mg_l"] = np.clip(np.random.normal(95, 45, n_samples), 15, 280)
 
-    # Lifestyle factors
-    smoking = np.random.binomial(1, 0.22, n_samples)  # 22% smokers
+# Temperature
+temp_base = np.where(
+    df["season"] == "Winter",
+    np.random.normal(18, 3, n_samples),
+    np.random.normal(26, 3, n_samples),
+)
+df["temperature_c"] = np.clip(temp_base, 14, 33)
 
-    # Exercise inversely related to BMI and age
-    exercise_hours = np.maximum(
-        0,
-        6 - (bmi - 23) * 0.15 - (age - 40) * 0.03 + np.random.normal(0, 2.5, n_samples),
-    )
-    exercise_hours = np.clip(exercise_hours, 0, 20)
+# Arsenic (WHO: <10 μg/L) - Higher in Assam groundwater
+arsenic_base = np.random.exponential(7, n_samples)
+df["arsenic_ug_l"] = np.where(
+    (df["state"] == "Assam") & (df["water_source"].isin(["Hand Pump", "Well"])),
+    arsenic_base * 2,
+    arsenic_base,
+)
+df["arsenic_ug_l"] = np.clip(df["arsenic_ug_l"], 0, 150)
 
-    # Physical activity categorization
-    physical_activity = np.where(
-        exercise_hours < 2,
-        0,  # Sedentary
-        np.where(
-            exercise_hours < 5,
-            1,  # Moderate
-            2,
-        ),
-    )  # Active
+# Iron (India: <0.3 mg/L)
+df["iron_mg_l"] = np.clip(np.random.exponential(0.6, n_samples), 0.01, 4.0)
 
-    # Alcohol consumption
-    alcohol_consumption = np.random.choice([0, 1, 2], n_samples, p=[0.35, 0.50, 0.15])
+# Population and sanitation
+df["population_served"] = np.random.choice(
+    [50, 100, 200, 500, 1000, 2000], n_samples, p=[0.25, 0.25, 0.20, 0.15, 0.10, 0.05]
+)
+df["sanitation_access_percent"] = np.random.choice(
+    [20, 40, 60, 80, 100], n_samples, p=[0.15, 0.25, 0.30, 0.20, 0.10]
+)
 
-    # Sleep patterns
-    sleep_hours = np.random.normal(7, 1.3, n_samples)
-    sleep_hours = np.clip(sleep_hours, 3, 11)
+# Round values
+for col in df.select_dtypes(include=[np.float64]).columns:
+    df[col] = np.round(df[col], 2)
 
-    # Mental health
-    stress_level = np.random.randint(1, 11, n_samples)
+print("  ✓ Water quality parameters generated")
 
-    # Dietary habits
-    diet_quality = np.random.choice([0, 1, 2], n_samples, p=[0.25, 0.55, 0.20])
+# Create disease outbreak labels
+print("  Calculating disease outbreak risks...")
 
-    # Medical history
-    family_history = np.random.binomial(1, 0.35, n_samples)  # 35% family history
-    previous_heart_condition = np.random.binomial(1, 0.12, n_samples)
-    diabetes_history = np.random.binomial(1, 0.15, n_samples)
-    chronic_kidney_disease = np.random.binomial(1, 0.08, n_samples)
+# CHOLERA - Main factors: fecal contamination, turbidity, low DO, monsoon
+cholera_score = (
+    (df["fecal_coliform_mpn"] > 80) * 35
+    + (df["fecal_coliform_mpn"] > 40) * 25
+    + (df["turbidity_ntu"] > 15) * 22
+    + (df["dissolved_oxygen_mg_l"] < 4) * 23
+    + (df["season"] == "Monsoon") * 28
+    + (df["water_source"] == "Pond") * 25
+    + (df["sanitation_access_percent"] < 40) * 18
+    + np.random.normal(0, 11, n_samples)
+)
+df["cholera_outbreak"] = (cholera_score > 65).astype(int)
 
-    # Medications
-    on_medication = np.random.binomial(1, 0.28, n_samples)
+# TYPHOID - Fecal contamination, poor sanitation
+typhoid_score = (
+    (df["fecal_coliform_mpn"] > 60) * 33
+    + (df["total_coliform_mpn"] > 300) * 28
+    + (df["turbidity_ntu"] > 12) * 20
+    + (df["sanitation_access_percent"] < 60) * 24
+    + (df["season"].isin(["Monsoon", "Pre-Monsoon"])) * 22
+    + (df["water_source"].isin(["Well", "Pond"])) * 20
+    + np.random.normal(0, 10, n_samples)
+)
+df["typhoid_outbreak"] = (typhoid_score > 62).astype(int)
 
-    # Kidney function
-    creatinine = np.where(
-        chronic_kidney_disease == 1,
-        np.random.uniform(1.5, 3.5, n_samples),
-        np.random.uniform(0.7, 1.3, n_samples),
-    )
+# DYSENTERY - High fecal contamination
+dysentery_score = (
+    (df["fecal_coliform_mpn"] > 100) * 38
+    + (df["total_coliform_mpn"] > 400) * 32
+    + (df["sanitation_access_percent"] < 50) * 27
+    + (df["turbidity_ntu"] > 20) * 22
+    + (df["season"] == "Monsoon") * 24
+    + (df["water_source"] == "Pond") * 28
+    + np.random.normal(0, 12, n_samples)
+)
+df["dysentery_outbreak"] = (dysentery_score > 68).astype(int)
 
-    # Liver function
-    alt_enzyme = (
-        20
-        + (bmi - 22) * 0.8
-        + alcohol_consumption * 8
-        + np.random.normal(0, 10, n_samples)
-    )
-    alt_enzyme = np.clip(alt_enzyme, 10, 150).astype(int)
+# HEPATITIS A - Fecal-oral transmission
+hepatitis_score = (
+    (df["fecal_coliform_mpn"] > 70) * 32
+    + (df["total_coliform_mpn"] > 350) * 28
+    + (df["sanitation_access_percent"] < 55) * 23
+    + (df["turbidity_ntu"] > 14) * 20
+    + (df["season"].isin(["Pre-Monsoon", "Monsoon"])) * 22
+    + (df["population_served"] > 500) * 15
+    + np.random.normal(0, 11, n_samples)
+)
+df["hepatitis_a_outbreak"] = (hepatitis_score > 64).astype(int)
 
-    # Calculate comprehensive risk score
-    risk_score = (
-        (age > 60) * 25
-        + (age > 50) * 15
-        + (age > 40) * 8
-        + (gender == 1) * 6
-        + (bmi > 35) * 30
-        + (bmi > 30) * 20
-        + (bmi > 25) * 10
-        + (blood_pressure_systolic > 160) * 35
-        + (blood_pressure_systolic > 140) * 25
-        + (blood_pressure_systolic > 130) * 15
-        + (blood_pressure_diastolic > 100) * 25
-        + (blood_pressure_diastolic > 90) * 15
-        + (cholesterol_total > 260) * 25
-        + (cholesterol_total > 240) * 18
-        + (cholesterol_total > 200) * 10
-        + (cholesterol_ldl > 160) * 20
-        + (cholesterol_ldl > 130) * 12
-        + (cholesterol_hdl < 40) * 15
-        + (triglycerides > 200) * 18
-        + (triglycerides > 150) * 10
-        + (blood_sugar_fasting > 126) * 30
-        + (blood_sugar_fasting > 100) * 18
-        + (hba1c > 6.5) * 28
-        + (hba1c > 5.7) * 15
-        + smoking * 20
-        + (exercise_hours < 2) * 18
-        + (exercise_hours < 4) * 10
-        + family_history * 22
-        + (physical_activity == 0) * 15
-        + (alcohol_consumption == 2) * 12
-        + (sleep_hours < 6) * 12
-        + (stress_level > 8) * 10
-        + (stress_level > 6) * 5
-        + (diet_quality == 0) * 15
-        + previous_heart_condition * 30
-        + diabetes_history * 25
-        + chronic_kidney_disease * 22
-        + (heart_rate > 100) * 12
-        + (heart_rate < 60) * 8
-        + on_medication * 10
-        + (creatinine > 1.5) * 18
-        + (alt_enzyme > 40) * 10
-        + np.random.normal(0, 8, n_samples)
-    )
+# Overall outbreak
+df["overall_outbreak"] = (
+    (df["cholera_outbreak"] == 1)
+    | (df["typhoid_outbreak"] == 1)
+    | (df["dysentery_outbreak"] == 1)
+    | (df["hepatitis_a_outbreak"] == 1)
+).astype(int)
 
-    # Binary classification (threshold calibrated for ~35% high risk)
-    disease_risk = (risk_score > 75).astype(int)
+print("  ✓ Disease risks calculated")
 
-    # Create DataFrame
-    df = pd.DataFrame(
-        {
-            "age": age,
-            "gender": gender,
-            "height_cm": np.round(height_cm, 1),
-            "weight_kg": np.round(weight_kg, 1),
-            "bmi": np.round(bmi, 1),
-            "blood_pressure_systolic": blood_pressure_systolic,
-            "blood_pressure_diastolic": blood_pressure_diastolic,
-            "cholesterol_total": cholesterol_total,
-            "cholesterol_ldl": cholesterol_ldl,
-            "cholesterol_hdl": cholesterol_hdl,
-            "triglycerides": triglycerides,
-            "blood_sugar_fasting": blood_sugar_fasting,
-            "hba1c": np.round(hba1c, 1),
-            "heart_rate": heart_rate,
-            "smoking": smoking,
-            "exercise_hours": np.round(exercise_hours, 1),
-            "physical_activity": physical_activity,
-            "alcohol_consumption": alcohol_consumption,
-            "sleep_hours": np.round(sleep_hours, 1),
-            "stress_level": stress_level,
-            "diet_quality": diet_quality,
-            "family_history": family_history,
-            "previous_heart_condition": previous_heart_condition,
-            "diabetes_history": diabetes_history,
-            "chronic_kidney_disease": chronic_kidney_disease,
-            "on_medication": on_medication,
-            "creatinine": np.round(creatinine, 2),
-            "alt_enzyme": alt_enzyme,
-            "disease_risk": disease_risk,
-        }
-    )
+# Add timestamps
+dates = pd.date_range(start="2023-01-01", end="2024-12-31", periods=n_samples)
+df.insert(0, "sample_date", dates)
+df.insert(1, "sample_id", [f"WQ{str(i).zfill(6)}" for i in range(1, n_samples + 1)])
 
-    return df
+# Save
+df.to_csv("data/raw/water_quality_data.csv", index=False)
 
+print(f"\n✓ Dataset saved: data/raw/water_quality_data.csv")
+print(
+    f"✓ File size: {os.path.getsize('data/raw/water_quality_data.csv') / (1024 * 1024):.2f} MB"
+)
 
-if __name__ == "__main__":
-    # Create directories
-    os.makedirs("data/raw", exist_ok=True)
-    os.makedirs("data/processed", exist_ok=True)
-    os.makedirs("data/sample", exist_ok=True)
+# Statistics
+print("\n" + "=" * 80)
+print("DATASET STATISTICS")
+print("=" * 80)
+print(f"\nTotal Records: {len(df):,}")
+print(
+    f"Date Range: {df['sample_date'].min().date()} to {df['sample_date'].max().date()}"
+)
 
-    # Generate full dataset
-    print("=" * 70)
-    print("HEALTH RISK DATASET GENERATOR")
-    print("=" * 70)
+print(f"\nState Distribution:")
+for state in states:
+    count = (df["state"] == state).sum()
+    print(f"  {state:20s}: {count:>5,} ({count / len(df) * 100:>5.1f}%)")
 
-    df = generate_large_dataset(5000)
+print(f"\nWater Source Distribution:")
+for source in water_sources:
+    count = (df["water_source"] == source).sum()
+    print(f"  {source:15s}: {count:>5,} ({count / len(df) * 100:>5.1f}%)")
 
-    # Save full dataset
-    df.to_csv("data/raw/health_risk_dataset_full.csv", index=False)
-    print(f"\n✅ Full dataset saved: data/raw/health_risk_dataset_full.csv")
+print(f"\nDisease Outbreak Distribution:")
+diseases = [
+    "cholera_outbreak",
+    "typhoid_outbreak",
+    "dysentery_outbreak",
+    "hepatitis_a_outbreak",
+    "overall_outbreak",
+]
+disease_names = ["Cholera", "Typhoid", "Dysentery", "Hepatitis A", "Overall"]
+for name, col in zip(disease_names, diseases):
+    count = df[col].sum()
+    print(f"  {name:12s}: {count:>5,} ({df[col].mean() * 100:>5.2f}%)")
 
-    # Create training dataset (80%)
-    df_train = df.sample(frac=0.8, random_state=42)
-    df_train.to_csv("data/processed/train_data.csv", index=False)
-    print(
-        f"✅ Training dataset saved: data/processed/train_data.csv ({len(df_train)} records)"
-    )
-
-    # Create test dataset (20%)
-    df_test = df.drop(df_train.index)
-    df_test.to_csv("data/processed/test_data.csv", index=False)
-    print(
-        f"✅ Test dataset saved: data/processed/test_data.csv ({len(df_test)} records)"
-    )
-
-    # Create sample for testing (100 records)
-    df_sample = df.sample(n=100, random_state=42)
-    df_sample_input = df_sample.drop("disease_risk", axis=1)
-    df_sample_input.to_csv("data/sample/sample_input.csv", index=False)
-    print(f"✅ Sample input saved: data/sample/sample_input.csv (100 records)")
-
-    # Statistics
-    print("\n" + "=" * 70)
-    print("DATASET STATISTICS")
-    print("=" * 70)
-    print(f"\nTotal Records: {len(df)}")
-    print(f"Features: {len(df.columns) - 1}")
-    print(f"\nFeature List:")
-    for i, col in enumerate(df.columns[:-1], 1):
-        print(f"  {i:2d}. {col}")
-
-    print(f"\n{'=' * 70}")
-    print("TARGET DISTRIBUTION")
-    print(f"{'=' * 70}")
-    print(df["disease_risk"].value_counts())
-    print(f"\nPercentage:")
-    dist = df["disease_risk"].value_counts(normalize=True) * 100
-    print(f"  Low Risk (0):  {dist[0]:.2f}%")
-    print(f"  High Risk (1): {dist[1]:.2f}%")
-
-    print(f"\n{'=' * 70}")
-    print("SAMPLE DATA (First 5 rows)")
-    print(f"{'=' * 70}")
-    print(df.head().to_string())
-
-    print(f"\n{'=' * 70}")
-    print("✅ DATASET GENERATION COMPLETED!")
-    print(f"{'=' * 70}\n")
+print("\n" + "=" * 80)
+print("✅ DATASET GENERATION COMPLETE!")
+print("=" * 80)
+print("\nNext step: Train models")
+print("Command: python train_models.py")
+print("=" * 80 + "\n")
