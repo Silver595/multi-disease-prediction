@@ -1,389 +1,315 @@
-# scripts/train_model.py
+# train_models.py
 """
-Train disease risk prediction model from CSV dataset
+Train ML Models for Waterborne Disease Prediction
+With detailed performance metrics
 """
 
 import pandas as pd
 import numpy as np
 import pickle
-import matplotlib.pyplot as plt
-import seaborn as sns
+import os
+import json
 from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from xgboost import XGBClassifier
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
     precision_score,
     recall_score,
     f1_score,
+    roc_auc_score,
     confusion_matrix,
     classification_report,
-    roc_auc_score,
-    roc_curve,
 )
 from imblearn.over_sampling import SMOTE
+import matplotlib.pyplot as plt
+import seaborn as sns
 import warnings
-import os
 
 warnings.filterwarnings("ignore")
-sns.set_style("whitegrid")
 
+print("\n" + "=" * 80)
+print("MODEL TRAINING - WATERBORNE DISEASE PREDICTION")
+print("Northeast India Community Health Monitoring")
+print("=" * 80)
 
-def load_dataset(filepath):
-    """Load dataset from CSV"""
-    print("=" * 70)
-    print(f"LOADING DATASET FROM: {filepath}")
-    print("=" * 70)
+os.makedirs("models", exist_ok=True)
+os.makedirs("reports", exist_ok=True)
 
-    df = pd.read_csv(filepath)
+# Load data
+print("\n[1/4] Loading dataset...")
+df = pd.read_csv("data/raw/water_quality_data.csv")
+print(f"✓ Loaded {len(df):,} records")
+print(f"✓ Date range: {df['sample_date'].min()} to {df['sample_date'].max()}")
 
-    print(f"\n✓ Dataset loaded successfully!")
-    print(f"✓ Shape: {df.shape}")
-    print(f"✓ Columns: {len(df.columns)}")
-    print(f"✓ Records: {len(df)}")
+# Encode categorical variables
+print("\n[2/4] Preprocessing data...")
+label_encoders = {}
+categorical_cols = ["state", "location_type", "water_source", "season"]
 
-    return df
+for col in categorical_cols:
+    le = LabelEncoder()
+    df[f"{col}_encoded"] = le.fit_transform(df[col])
+    label_encoders[col] = le
 
+# Save encoders
+with open("models/label_encoders.pkl", "wb") as f:
+    pickle.dump(label_encoders, f)
 
-def explore_dataset(df):
-    """Exploratory Data Analysis"""
-    print("\n" + "=" * 70)
-    print("EXPLORATORY DATA ANALYSIS")
-    print("=" * 70)
+print(f"✓ Encoded {len(categorical_cols)} categorical features")
 
-    print("\n1. Dataset Info:")
-    print(df.info())
+# Select features
+feature_cols = [
+    "state_encoded",
+    "location_type_encoded",
+    "water_source_encoded",
+    "season_encoded",
+    "ph",
+    "turbidity_ntu",
+    "tds_mg_l",
+    "dissolved_oxygen_mg_l",
+    "bod_mg_l",
+    "fecal_coliform_mpn",
+    "total_coliform_mpn",
+    "nitrate_mg_l",
+    "fluoride_mg_l",
+    "chloride_mg_l",
+    "hardness_mg_l",
+    "temperature_c",
+    "arsenic_ug_l",
+    "iron_mg_l",
+    "population_served",
+    "sanitation_access_percent",
+]
 
-    print("\n2. Missing Values:")
-    missing = df.isnull().sum()
-    if missing.sum() == 0:
-        print("✓ No missing values found!")
-    else:
-        print(missing[missing > 0])
+X = df[feature_cols]
+print(f"✓ Selected {len(feature_cols)} features")
 
-    print("\n3. Duplicate Records:")
-    duplicates = df.duplicated().sum()
-    print(f"✓ Duplicates: {duplicates}")
+# Train models
+print("\n[3/4] Training disease-specific models...")
+print("This will take 2-3 minutes...\n")
 
-    print("\n4. Target Distribution:")
-    print(df["disease_risk"].value_counts())
-    print("\nPercentage:")
-    print(df["disease_risk"].value_counts(normalize=True) * 100)
+diseases = {
+    "cholera": "cholera_outbreak",
+    "typhoid": "typhoid_outbreak",
+    "dysentery": "dysentery_outbreak",
+    "hepatitis_a": "hepatitis_a_outbreak",
+    "overall": "overall_outbreak",
+}
 
-    print("\n5. Statistical Summary:")
-    print(df.describe())
+disease_models = {}
+disease_scalers = {}
+disease_results = []
 
+for idx, (disease_name, target_col) in enumerate(diseases.items(), 1):
+    print(f"[{idx}/5] Training: {disease_name.replace('_', ' ').title()}")
 
-def create_visualizations(df):
-    """Generate and save visualizations"""
-    print("\n" + "=" * 70)
-    print("CREATING VISUALIZATIONS")
-    print("=" * 70)
+    y = df[target_col]
 
-    os.makedirs("visualizations", exist_ok=True)
-
-    # Target distribution
-    plt.figure(figsize=(10, 6))
-    counts = df["disease_risk"].value_counts()
-    plt.bar(["Low Risk", "High Risk"], counts.values, color=["green", "red"], alpha=0.7)
-    plt.title("Disease Risk Distribution", fontsize=16, fontweight="bold")
-    plt.ylabel("Number of Patients")
-    for i, v in enumerate(counts.values):
-        plt.text(i, v + 50, str(v), ha="center", fontweight="bold")
-    plt.tight_layout()
-    plt.savefig("visualizations/01_target_distribution.png", dpi=300)
-    print("✓ Saved: 01_target_distribution.png")
-    plt.close()
-
-    # Correlation matrix
-    plt.figure(figsize=(20, 16))
-    correlation = df.corr()
-    sns.heatmap(
-        correlation,
-        annot=True,
-        fmt=".2f",
-        cmap="coolwarm",
-        center=0,
-        linewidths=0.5,
-        cbar_kws={"shrink": 0.8},
+    # Split data
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
     )
-    plt.title("Feature Correlation Matrix", fontsize=18, fontweight="bold")
-    plt.tight_layout()
-    plt.savefig("visualizations/02_correlation_matrix.png", dpi=300)
-    print("✓ Saved: 02_correlation_matrix.png")
-    plt.close()
 
-    # Age distribution by risk
-    plt.figure(figsize=(12, 6))
-    plt.hist(
-        [df[df["disease_risk"] == 0]["age"], df[df["disease_risk"] == 1]["age"]],
-        bins=30,
-        label=["Low Risk", "High Risk"],
-        color=["green", "red"],
-        alpha=0.7,
+    print(f"    Train: {len(X_train):,} | Test: {len(X_test):,}")
+
+    # Scale features
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
+    # Handle class imbalance
+    smote = SMOTE(random_state=42)
+    X_train_balanced, y_train_balanced = smote.fit_resample(X_train_scaled, y_train)
+    print(f"    SMOTE: {len(X_train_balanced):,} samples")
+
+    # Train model
+    model = XGBClassifier(
+        n_estimators=150,
+        max_depth=6,
+        learning_rate=0.1,
+        subsample=0.9,
+        colsample_bytree=0.9,
+        random_state=42,
+        eval_metric="logloss",
+        n_jobs=-1,
+        verbosity=0,
     )
-    plt.xlabel("Age", fontsize=12)
-    plt.ylabel("Frequency", fontsize=12)
-    plt.title("Age Distribution by Risk Level", fontsize=16, fontweight="bold")
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig("visualizations/03_age_distribution.png", dpi=300)
-    print("✓ Saved: 03_age_distribution.png")
-    plt.close()
 
+    model.fit(X_train_balanced, y_train_balanced)
 
-def train_and_compare_models(X_train, X_test, y_train, y_test):
-    """Train multiple models and compare performance"""
-    print("\n" + "=" * 70)
-    print("TRAINING MULTIPLE MODELS")
-    print("=" * 70)
+    # Evaluate
+    y_pred = model.predict(X_test_scaled)
+    y_pred_proba = model.predict_proba(X_test_scaled)[:, 1]
 
-    models = {
-        "Logistic Regression": LogisticRegression(random_state=42, max_iter=1000),
-        "Random Forest": RandomForestClassifier(
-            n_estimators=200, random_state=42, n_jobs=-1
-        ),
-        "Gradient Boosting": GradientBoostingClassifier(
-            n_estimators=200, random_state=42
-        ),
-        "XGBoost": XGBClassifier(
-            n_estimators=200, random_state=42, eval_metric="logloss", n_jobs=-1
-        ),
-    }
+    # Calculate metrics
+    accuracy = accuracy_score(y_test, y_pred)
+    precision = precision_score(y_test, y_pred, zero_division=0)
+    recall = recall_score(y_test, y_pred, zero_division=0)
+    f1 = f1_score(y_test, y_pred, zero_division=0)
+    roc_auc = roc_auc_score(y_test, y_pred_proba)
 
-    results = []
-    trained_models = {}
+    # Cross-validation
+    cv_scores = cross_val_score(
+        model, X_train_balanced, y_train_balanced, cv=5, scoring="accuracy", n_jobs=-1
+    )
 
-    for name, model in models.items():
-        print(f"\n{'─' * 70}")
-        print(f"Training: {name}")
-        print(f"{'─' * 70}")
+    print(
+        f"    Accuracy: {accuracy * 100:>6.2f}% | Precision: {precision * 100:>6.2f}% | Recall: {recall * 100:>6.2f}% | F1: {f1 * 100:>6.2f}% | AUC: {roc_auc:.3f}"
+    )
+    print(
+        f"    CV Accuracy: {cv_scores.mean() * 100:>6.2f}% ± {cv_scores.std() * 100:>4.2f}%\n"
+    )
 
-        # Train
-        model.fit(X_train, y_train)
+    # Save model and scaler
+    disease_models[disease_name] = model
+    disease_scalers[disease_name] = scaler
 
-        # Predict
-        y_pred = model.predict(X_test)
-        y_pred_proba = model.predict_proba(X_test)[:, 1]
+    disease_results.append(
+        {
+            "Disease": disease_name.replace("_", " ").title(),
+            "Accuracy": round(accuracy, 4),
+            "Precision": round(precision, 4),
+            "Recall": round(recall, 4),
+            "F1-Score": round(f1, 4),
+            "ROC-AUC": round(roc_auc, 4),
+            "CV_Accuracy_Mean": round(cv_scores.mean(), 4),
+            "CV_Accuracy_Std": round(cv_scores.std(), 4),
+        }
+    )
 
-        # Metrics
-        accuracy = accuracy_score(y_test, y_pred)
-        precision = precision_score(y_test, y_pred)
-        recall = recall_score(y_test, y_pred)
-        f1 = f1_score(y_test, y_pred)
-        roc_auc = roc_auc_score(y_test, y_pred_proba)
-
-        results.append(
-            {
-                "Model": name,
-                "Accuracy": f"{accuracy:.4f}",
-                "Precision": f"{precision:.4f}",
-                "Recall": f"{recall:.4f}",
-                "F1-Score": f"{f1:.4f}",
-                "ROC-AUC": f"{roc_auc:.4f}",
-            }
-        )
-
-        trained_models[name] = model
-
-        print(f"  Accuracy:  {accuracy:.4f}")
-        print(f"  Precision: {precision:.4f}")
-        print(f"  Recall:    {recall:.4f}")
-        print(f"  F1-Score:  {f1:.4f}")
-        print(f"  ROC-AUC:   {roc_auc:.4f}")
-
-    results_df = pd.DataFrame(results)
-
-    print("\n" + "=" * 70)
-    print("MODEL PERFORMANCE COMPARISON")
-    print("=" * 70)
-    print(results_df.to_string(index=False))
-
-    return trained_models, results_df
-
-
-def detailed_evaluation(model, X_test, y_test, feature_names):
-    """Detailed model evaluation"""
-    print("\n" + "=" * 70)
-    print("DETAILED MODEL EVALUATION")
-    print("=" * 70)
-
-    y_pred = model.predict(X_test)
-    y_pred_proba = model.predict_proba(X_test)[:, 1]
-
-    # Classification report
-    print("\nClassification Report:")
-    print(classification_report(y_test, y_pred, target_names=["Low Risk", "High Risk"]))
-
-    # Confusion matrix visualization
+    # Create confusion matrix
     cm = confusion_matrix(y_test, y_pred)
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(6, 5))
     sns.heatmap(
         cm,
         annot=True,
         fmt="d",
         cmap="Blues",
-        xticklabels=["Low Risk", "High Risk"],
-        yticklabels=["Low Risk", "High Risk"],
-        cbar_kws={"label": "Count"},
+        xticklabels=["No Outbreak", "Outbreak"],
+        yticklabels=["No Outbreak", "Outbreak"],
     )
-    plt.title("Confusion Matrix", fontsize=16, fontweight="bold")
-    plt.ylabel("Actual", fontsize=12)
-    plt.xlabel("Predicted", fontsize=12)
+    plt.title(
+        f"{disease_name.replace('_', ' ').title()} - Confusion Matrix",
+        fontweight="bold",
+        fontsize=12,
+    )
+    plt.ylabel("Actual")
+    plt.xlabel("Predicted")
     plt.tight_layout()
-    plt.savefig("visualizations/04_confusion_matrix.png", dpi=300)
-    print("✓ Saved: 04_confusion_matrix.png")
+    plt.savefig(
+        f"reports/{disease_name}_confusion_matrix.png", dpi=300, bbox_inches="tight"
+    )
     plt.close()
 
-    # ROC Curve
-    fpr, tpr, _ = roc_curve(y_test, y_pred_proba)
-    roc_auc = roc_auc_score(y_test, y_pred_proba)
+# Save everything
+print("=" * 80)
+print("[4/4] Saving models and metadata")
+print("=" * 80 + "\n")
 
-    plt.figure(figsize=(10, 8))
-    plt.plot(
-        fpr, tpr, color="darkorange", lw=3, label=f"ROC Curve (AUC = {roc_auc:.4f})"
-    )
-    plt.plot(
-        [0, 1], [0, 1], color="navy", lw=2, linestyle="--", label="Random Classifier"
-    )
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel("False Positive Rate", fontsize=12)
-    plt.ylabel("True Positive Rate", fontsize=12)
-    plt.title("ROC Curve", fontsize=16, fontweight="bold")
-    plt.legend(loc="lower right", fontsize=12)
-    plt.grid(alpha=0.3)
-    plt.tight_layout()
-    plt.savefig("visualizations/05_roc_curve.png", dpi=300)
-    print("✓ Saved: 05_roc_curve.png")
-    plt.close()
-
-    # Feature importance
-    if hasattr(model, "feature_importances_"):
-        importance_df = pd.DataFrame(
-            {"Feature": feature_names, "Importance": model.feature_importances_}
-        ).sort_values("Importance", ascending=False)
-
-        print("\nTop 15 Important Features:")
-        print(importance_df.head(15).to_string(index=False))
-
-        plt.figure(figsize=(12, 10))
-        top_features = importance_df.head(20)
-        sns.barplot(x="Importance", y="Feature", data=top_features, palette="viridis")
-        plt.title("Top 20 Feature Importance", fontsize=16, fontweight="bold")
-        plt.xlabel("Importance Score", fontsize=12)
-        plt.ylabel("Feature", fontsize=12)
-        plt.tight_layout()
-        plt.savefig("visualizations/06_feature_importance.png", dpi=300)
-        print("✓ Saved: 06_feature_importance.png")
-        plt.close()
-
-
-def save_model_files(model, scaler, feature_names):
-    """Save model, scaler, and metadata"""
-    print("\n" + "=" * 70)
-    print("SAVING MODEL FILES")
-    print("=" * 70)
-
-    os.makedirs("models", exist_ok=True)
-
-    with open("models/disease_model.pkl", "wb") as f:
+# Save models
+for disease_name, model in disease_models.items():
+    with open(f"models/{disease_name}_model.pkl", "wb") as f:
         pickle.dump(model, f)
-    print("✓ Saved: models/disease_model.pkl")
+    print(f"  ✓ Saved: {disease_name}_model.pkl")
 
-    with open("models/scaler.pkl", "wb") as f:
+# Save scalers
+for disease_name, scaler in disease_scalers.items():
+    with open(f"models/{disease_name}_scaler.pkl", "wb") as f:
         pickle.dump(scaler, f)
-    print("✓ Saved: models/scaler.pkl")
 
-    with open("models/feature_names.pkl", "wb") as f:
-        pickle.dump(feature_names, f)
-    print("✓ Saved: models/feature_names.pkl")
+# Save feature names
+with open("models/feature_names.pkl", "wb") as f:
+    pickle.dump(feature_cols, f)
 
+# Save metadata with all results
+metadata = {
+    "project": "Water-Borne Disease Early Warning System",
+    "region": "Northeast India",
+    "dataset_size": int(len(df)),
+    "training_date": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
+    "diseases": list(diseases.keys()),
+    "features": feature_cols,
+    "categorical_features": categorical_cols,
+    "model_type": "XGBoost Classifier",
+    "results": disease_results,
+}
 
-def main():
-    """Main training pipeline"""
-    print("\n" + "=" * 70)
-    print("DISEASE RISK PREDICTION - MODEL TRAINING PIPELINE")
-    print("=" * 70)
+with open("models/metadata.json", "w") as f:
+    json.dump(metadata, f, indent=4)
 
-    # Step 1: Load dataset
-    df = load_dataset("data/raw/health_risk_dataset_full.csv")
+# Save results CSV
+results_df = pd.DataFrame(disease_results)
+results_df.to_csv("reports/model_performance.csv", index=False)
 
-    # Step 2: Explore dataset
-    explore_dataset(df)
+# Feature importance
+overall_model = disease_models["overall"]
+feature_importance = pd.DataFrame(
+    {"Feature": feature_cols, "Importance": overall_model.feature_importances_}
+).sort_values("Importance", ascending=False)
 
-    # Step 3: Create visualizations
-    create_visualizations(df)
+feature_importance.to_csv("reports/feature_importance.csv", index=False)
 
-    # Step 4: Prepare data
-    print("\n" + "=" * 70)
-    print("DATA PREPARATION")
-    print("=" * 70)
+# Plot feature importance
+plt.figure(figsize=(12, 8))
+top_features = feature_importance.head(15)
+colors = plt.cm.viridis(np.linspace(0, 1, len(top_features)))
+plt.barh(top_features["Feature"], top_features["Importance"], color=colors)
+plt.xlabel("Importance Score", fontweight="bold")
+plt.ylabel("Feature", fontweight="bold")
+plt.title(
+    "Top 15 Most Important Features for Disease Prediction",
+    fontsize=14,
+    fontweight="bold",
+)
+plt.tight_layout()
+plt.savefig("reports/feature_importance.png", dpi=300, bbox_inches="tight")
+plt.close()
 
-    X = df.drop("disease_risk", axis=1)
-    y = df["disease_risk"]
-    feature_names = X.columns.tolist()
+print(f"\n  ✓ Metadata: metadata.json")
+print(f"  ✓ Results: model_performance.csv")
+print(f"  ✓ Feature importance: feature_importance.csv")
+print(f"  ✓ Visualizations: {len(diseases)} confusion matrices + feature importance")
 
-    print(f"\n✓ Total features: {len(feature_names)}")
-    print(f"✓ Feature list: {', '.join(feature_names[:5])}... (showing first 5)")
+# Final summary
+print("\n" + "=" * 80)
+print("✅ MODEL TRAINING COMPLETED SUCCESSFULLY!")
+print("=" * 80)
 
-    # Step 5: Train-test split
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
+print(f"\nDataset Size:     {len(df):,} water quality records")
+print(f"Models Trained:   {len(diseases)}")
+print(f"Features Used:    {len(feature_cols)}")
+print(f"Model Type:       XGBoost Classifier")
+
+print("\nModel Performance Summary:")
+print("-" * 110)
+print(
+    f"{'Disease':<15} {'Accuracy':<12} {'Precision':<12} {'Recall':<12} {'F1-Score':<12} {'AUC':<10} {'CV Acc':<12}"
+)
+print("-" * 110)
+for result in disease_results:
+    print(
+        f"{result['Disease']:<15} "
+        f"{result['Accuracy'] * 100:>6.2f}%     "
+        f"{result['Precision'] * 100:>6.2f}%     "
+        f"{result['Recall'] * 100:>6.2f}%     "
+        f"{result['F1-Score'] * 100:>6.2f}%     "
+        f"{result['ROC-AUC']:>6.3f}    "
+        f"{result['CV_Accuracy_Mean'] * 100:>6.2f}%"
     )
-    print(f"\n✓ Training set: {len(X_train)} samples")
-    print(f"✓ Test set: {len(X_test)} samples")
+print("-" * 110)
 
-    # Step 6: Feature scaling
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
-    print(f"\n✓ Features scaled using StandardScaler")
+avg_accuracy = sum(r["Accuracy"] for r in disease_results) / len(disease_results)
+print(f"\nAverage Accuracy: {avg_accuracy * 100:.2f}%")
 
-    # Step 7: Handle class imbalance
-    smote = SMOTE(random_state=42)
-    X_train_balanced, y_train_balanced = smote.fit_resample(X_train_scaled, y_train)
-    print(f"✓ Applied SMOTE - Balanced training set: {len(X_train_balanced)} samples")
+print("\nTop 10 Most Important Features:")
+print("-" * 50)
+for idx, row in feature_importance.head(10).iterrows():
+    print(f"  {idx + 1:2d}. {row['Feature']:30s}: {row['Importance']:.4f}")
 
-    # Step 8: Train models
-    trained_models, results_df = train_and_compare_models(
-        X_train_balanced, X_test_scaled, y_train_balanced, y_test
-    )
-
-    # Step 9: Select best model (highest F1-score)
-    best_idx = results_df["F1-Score"].astype(float).idxmax()
-    best_model_name = results_df.loc[best_idx, "Model"]
-    best_model = trained_models[best_model_name]
-
-    print(f"\n{'=' * 70}")
-    print(f"🏆 BEST MODEL: {best_model_name}")
-    print(f"{'=' * 70}")
-
-    # Step 10: Detailed evaluation
-    detailed_evaluation(best_model, X_test_scaled, y_test, feature_names)
-
-    # Step 11: Save model
-    save_model_files(best_model, scaler, feature_names)
-
-    # Final summary
-    print("\n" + "=" * 70)
-    print("✅ MODEL TRAINING COMPLETED SUCCESSFULLY!")
-    print("=" * 70)
-    print(f"\nBest Model: {best_model_name}")
-    print(f"F1-Score: {results_df.loc[best_idx, 'F1-Score']}")
-    print(f"Accuracy: {results_df.loc[best_idx, 'Accuracy']}")
-    print(f"\nModel files saved in: models/")
-    print(f"Visualizations saved in: visualizations/")
-    print("\n" + "=" * 70)
-    print("NEXT STEPS:")
-    print("=" * 70)
-    print("1. Review visualizations in visualizations/ folder")
-    print("2. Run the Streamlit app: streamlit run app.py")
-    print("3. Test predictions with data/sample/sample_input.csv")
-    print("=" * 70 + "\n")
-
-
-if __name__ == "__main__":
-    main()
+print("\n" + "=" * 80)
+print("NEXT STEP: Run the Streamlit Dashboard")
+print("=" * 80)
+print("\nCommand: streamlit run app.py")
+print("\nThe system is now ready to monitor water quality and predict outbreaks!")
+print("=" * 80 + "\n")
