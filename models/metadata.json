@@ -1,0 +1,94 @@
+{
+    "project": "Water-Borne Disease Early Warning System",
+    "region": "Northeast India",
+    "dataset_size": 15000,
+    "training_date": "2025-10-29 13:37:02",
+    "diseases": [
+        "cholera",
+        "typhoid",
+        "dysentery",
+        "hepatitis_a",
+        "overall"
+    ],
+    "features": [
+        "state_encoded",
+        "location_type_encoded",
+        "water_source_encoded",
+        "season_encoded",
+        "ph",
+        "turbidity_ntu",
+        "tds_mg_l",
+        "dissolved_oxygen_mg_l",
+        "bod_mg_l",
+        "fecal_coliform_mpn",
+        "total_coliform_mpn",
+        "nitrate_mg_l",
+        "fluoride_mg_l",
+        "chloride_mg_l",
+        "hardness_mg_l",
+        "temperature_c",
+        "arsenic_ug_l",
+        "iron_mg_l",
+        "population_served",
+        "sanitation_access_percent"
+    ],
+    "categorical_features": [
+        "state",
+        "location_type",
+        "water_source",
+        "season"
+    ],
+    "model_type": "XGBoost Classifier",
+    "results": [
+        {
+            "Disease": "Cholera",
+            "Accuracy": 0.9437,
+            "Precision": 0.8982,
+            "Recall": 0.9035,
+            "F1-Score": 0.9009,
+            "ROC-AUC": 0.984,
+            "CV_Accuracy_Mean": 0.9566,
+            "CV_Accuracy_Std": 0.022
+        },
+        {
+            "Disease": "Typhoid",
+            "Accuracy": 0.922,
+            "Precision": 0.871,
+            "Recall": 0.8838,
+            "F1-Score": 0.8774,
+            "ROC-AUC": 0.9811,
+            "CV_Accuracy_Mean": 0.9442,
+            "CV_Accuracy_Std": 0.0211
+        },
+        {
+            "Disease": "Dysentery",
+            "Accuracy": 0.9503,
+            "Precision": 0.8488,
+            "Recall": 0.8668,
+            "F1-Score": 0.8577,
+            "ROC-AUC": 0.9835,
+            "CV_Accuracy_Mean": 0.9601,
+            "CV_Accuracy_Std": 0.0408
+        },
+        {
+            "Disease": "Hepatitis A",
+            "Accuracy": 0.9373,
+            "Precision": 0.8503,
+            "Recall": 0.8583,
+            "F1-Score": 0.8543,
+            "ROC-AUC": 0.9807,
+            "CV_Accuracy_Mean": 0.9487,
+            "CV_Accuracy_Std": 0.0353
+        },
+        {
+            "Disease": "Overall",
+            "Accuracy": 0.915,
+            "Precision": 0.9025,
+            "Recall": 0.8854,
+            "F1-Score": 0.8939,
+            "ROC-AUC": 0.9758,
+            "CV_Accuracy_Mean": 0.9329,
+            "CV_Accuracy_Std": 0.0128
+        }
+    ]
+}

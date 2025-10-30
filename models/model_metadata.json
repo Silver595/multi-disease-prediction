@@ -1,60 +1,76 @@
 {
+    "project_name": "Smart Community Health Monitoring System",
+    "target_region": "Rural Northeast India",
+    "dataset_size": 30000,
+    "training_date": "2025-10-29 12:33:31",
     "diseases": [
-        "diabetes",
-        "heart_disease",
-        "hypertension",
-        "stroke",
+        "cholera",
+        "typhoid",
+        "hepatitis_a",
+        "dysentery",
+        "diarrhea",
         "disease_risk"
     ],
     "features": [
-        "age",
-        "gender",
-        "bmi",
-        "blood_pressure",
-        "cholesterol",
-        "blood_sugar",
-        "heart_rate",
-        "smoking",
-        "exercise_hours",
-        "family_history"
+        "ph_level",
+        "turbidity",
+        "tds",
+        "chlorine",
+        "fecal_coliform",
+        "ecoli_count",
+        "water_temp",
+        "season",
+        "population_density",
+        "distance_to_source",
+        "sanitation",
+        "rainfall",
+        "storage_type",
+        "hygiene_score",
+        "age_group",
+        "previous_infection"
     ],
-    "training_date": "2025-10-14 00:38:10",
-    "training_samples": 5922,
     "results": [
         {
-            "Disease": "Diabetes",
-            "Accuracy": 0.939,
-            "Precision": 0.7974683544303798,
-            "Recall": 0.9356435643564357,
-            "F1-Score": 0.8610478359908884
+            "Disease": "Cholera",
+            "Accuracy": 0.9158,
+            "Precision": 0.9333,
+            "Recall": 0.9213,
+            "F1-Score": 0.9273
         },
         {
-            "Disease": "Heart Disease",
-            "Accuracy": 0.946,
-            "Precision": 0.696969696969697,
-            "Recall": 0.8679245283018868,
-            "F1-Score": 0.773109243697479
+            "Disease": "Typhoid",
+            "Accuracy": 0.9273,
+            "Precision": 0.9363,
+            "Recall": 0.9374,
+            "F1-Score": 0.9369
         },
         {
-            "Disease": "Hypertension",
-            "Accuracy": 0.968,
-            "Precision": 0.6805555555555556,
-            "Recall": 0.8448275862068966,
-            "F1-Score": 0.7538461538461538
+            "Disease": "Hepatitis A",
+            "Accuracy": 0.9173,
+            "Precision": 0.894,
+            "Recall": 0.9043,
+            "F1-Score": 0.8991
         },
         {
-            "Disease": "Stroke",
-            "Accuracy": 0.957,
-            "Precision": 0.5921052631578947,
-            "Recall": 0.7894736842105263,
-            "F1-Score": 0.6766917293233082
+            "Disease": "Dysentery",
+            "Accuracy": 0.9273,
+            "Precision": 0.9434,
+            "Recall": 0.9248,
+            "F1-Score": 0.934
+        },
+        {
+            "Disease": "Diarrhea",
+            "Accuracy": 0.943,
+            "Precision": 0.9653,
+            "Recall": 0.9637,
+            "F1-Score": 0.9645
         },
         {
             "Disease": "Disease Risk",
-            "Accuracy": 0.938,
-            "Precision": 0.8535714285714285,
-            "Recall": 0.9192307692307692,
-            "F1-Score": 0.8851851851851852
+            "Accuracy": 0.9493,
+            "Precision": 0.9692,
+            "Recall": 0.9718,
+            "F1-Score": 0.9705
         }
     ]
 }
