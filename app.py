@@ -1,160 +1,86 @@
 # app.py
 """
-Disease Risk Prediction System - Enhanced with Specific Disease Predictions
-Professional, Production-Ready, Zero Errors
-Shows: Diabetes, Heart Disease, Hypertension, Stroke
+Water-Borne Disease Early Warning System
+Northeast India Community Health Monitoring
+COMPLETE VERSION WITH ALL FEATURES
 """
 
 import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
+import json
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime
-import json
-from io import BytesIO
+import warnings
+
+warnings.filterwarnings("ignore")
 
 # ============================================================================
 # PAGE CONFIGURATION
 # ============================================================================
 st.set_page_config(
-    page_title="Disease Risk Prediction System",
-    page_icon="🏥",
+    page_title="Water Disease Early Warning",
+    page_icon="💧",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # ============================================================================
-# DISEASE INFORMATION
-# ============================================================================
-DISEASE_INFO = {
-    "diabetes": {
-        "name": "🩸 Diabetes",
-        "icon": "🩸",
-        "color": "#e91e63",
-        "description": "Blood sugar regulation disorder",
-    },
-    "heart_disease": {
-        "name": "❤️ Heart Disease",
-        "icon": "❤️",
-        "color": "#f44336",
-        "description": "Cardiovascular system disorder",
-    },
-    "hypertension": {
-        "name": "💉 Hypertension",
-        "icon": "💉",
-        "color": "#ff9800",
-        "description": "High blood pressure",
-    },
-    "stroke": {
-        "name": "🧠 Stroke",
-        "icon": "🧠",
-        "color": "#9c27b0",
-        "description": "Brain blood flow blockage",
-    },
-}
-
-# ============================================================================
-# CUSTOM CSS STYLING
+# CUSTOM CSS
 # ============================================================================
 st.markdown(
     """
 <style>
-    /* Main styling */
     .main-header {
-        font-size: 3rem;
+        font-size: 2.5rem;
         font-weight: bold;
-        background: linear-gradient(90deg, #1f77b4 0%, #ff7f0e 100%);
+        background: linear-gradient(90deg, #0066cc 0%, #00cc99 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         text-align: center;
-        margin-bottom: 1rem;
+        padding: 1rem 0;
     }
-
-    .sub-header {
-        font-size: 1.8rem;
-        color: #1f77b4;
-        border-bottom: 3px solid #ff7f0e;
-        padding-bottom: 0.5rem;
-        margin: 2rem 0 1rem 0;
-    }
-
-    /* Risk boxes */
-    .risk-box {
-        padding: 2rem;
-        border-radius: 15px;
-        margin: 1rem 0;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        animation: fadeIn 0.5s;
-    }
-
-    .high-risk {
+    .alert-high {
         background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
         border-left: 5px solid #f44336;
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin: 1rem 0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
-
-    .low-risk {
+    .alert-low {
         background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
         border-left: 5px solid #4caf50;
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin: 1rem 0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
-
-    /* Cards */
     .metric-card {
         background: white;
         padding: 1.5rem;
         border-radius: 10px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         text-align: center;
-        transition: transform 0.3s, box-shadow 0.3s;
+        transition: transform 0.3s;
     }
-
     .metric-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        transform: translateY(-3px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
     }
-
-    .feature-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 1.5rem;
-        border-radius: 10px;
-        margin: 0.5rem 0;
-    }
-
-    .editable-section {
-        background: #f8f9fa;
-        border: 2px dashed #1f77b4;
-        border-radius: 10px;
-        padding: 1.5rem;
-        margin: 1rem 0;
-    }
-
-    /* Animations */
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* Buttons */
     .stButton>button {
-        background: linear-gradient(90deg, #1f77b4 0%, #ff7f0e 100%);
+        background: linear-gradient(90deg, #0066cc 0%, #00cc99 100%);
         color: white;
         font-weight: bold;
         border: none;
         padding: 0.75rem 2rem;
-        border-radius: 25px;
-        transition: all 0.3s;
+        border-radius: 8px;
     }
-
     .stButton>button:hover {
-        transform: scale(1.05);
-        box-shadow: 0 4px 12px rgba(31, 119, 180, 0.4);
-    }
-
-    /* Tables */
-    .dataframe {
-        font-size: 0.9rem;
+        transform: scale(1.02);
+        box-shadow: 0 4px 12px rgba(0, 102, 204, 0.3);
     }
 </style>
 """,
@@ -162,32 +88,21 @@ st.markdown(
 )
 
 # ============================================================================
-# SESSION STATE INITIALIZATION
+# SESSION STATE
 # ============================================================================
-if "prediction_history" not in st.session_state:
-    st.session_state.prediction_history = []
-if "total_predictions" not in st.session_state:
-    st.session_state.total_predictions = 0
-if "current_prediction" not in st.session_state:
-    st.session_state.current_prediction = None
-if "edit_mode" not in st.session_state:
-    st.session_state.edit_mode = False
+if "test_history" not in st.session_state:
+    st.session_state.test_history = []
+if "alerts" not in st.session_state:
+    st.session_state.alerts = []
 
 
 # ============================================================================
 # LOAD MODELS
 # ============================================================================
 @st.cache_resource
-def load_model_files():
-    """Load all disease models"""
+def load_all_models():
     try:
-        diseases = [
-            "diabetes",
-            "heart_disease",
-            "hypertension",
-            "stroke",
-            "disease_risk",
-        ]
+        diseases = ["cholera", "typhoid", "dysentery", "hepatitis_a", "overall"]
         models = {}
         scalers = {}
 
@@ -200,39 +115,69 @@ def load_model_files():
         with open("models/feature_names.pkl", "rb") as f:
             features = pickle.load(f)
 
-        try:
-            with open("models/model_metadata.json", "r") as f:
-                metadata = json.load(f)
-        except:
-            metadata = {"model_name": "XGBoost", "accuracy": 0.965}
+        with open("models/label_encoders.pkl", "rb") as f:
+            encoders = pickle.load(f)
 
-        return models, scalers, features, metadata, True
-    except FileNotFoundError:
-        return None, None, None, None, False
+        with open("models/metadata.json", "r") as f:
+            metadata = json.load(f)
+
+        return models, scalers, features, encoders, metadata, True
+    except Exception as e:
+        st.error(f"Error loading models: {str(e)}")
+        return None, None, None, None, None, False
+
+
+# ============================================================================
+# DISEASE INFORMATION
+# ============================================================================
+DISEASES = {
+    "cholera": {
+        "name": "🦠 Cholera",
+        "color": "#e53935",
+        "description": "Acute diarrheal infection caused by Vibrio cholerae",
+        "symptoms": "Severe watery diarrhea, vomiting, rapid dehydration",
+        "prevention": "Safe water, proper sanitation, hand hygiene, vaccination",
+    },
+    "typhoid": {
+        "name": "🌡️ Typhoid",
+        "color": "#fb8c00",
+        "description": "Bacterial infection caused by Salmonella typhi",
+        "symptoms": "Prolonged fever, weakness, stomach pain, headache, loss of appetite",
+        "prevention": "Clean water, vaccination, food safety, hygiene",
+    },
+    "dysentery": {
+        "name": "💊 Dysentery",
+        "color": "#8e24aa",
+        "description": "Intestinal inflammation causing bloody diarrhea",
+        "symptoms": "Bloody diarrhea, severe abdominal cramps, fever, nausea",
+        "prevention": "Safe water, hygiene, proper sanitation, food safety",
+    },
+    "hepatitis_a": {
+        "name": "🧬 Hepatitis A",
+        "color": "#43a047",
+        "description": "Liver infection caused by Hepatitis A virus",
+        "symptoms": "Fatigue, nausea, jaundice, abdominal pain, dark urine",
+        "prevention": "Vaccination, safe water, hand hygiene, food safety",
+    },
+}
 
 
 # ============================================================================
 # UTILITY FUNCTIONS
 # ============================================================================
-def create_gauge_chart(value, title="Risk Score"):
-    """Create a beautiful gauge chart for risk score"""
+def create_gauge(value, title="Risk Score"):
     fig = go.Figure(
         go.Indicator(
-            mode="gauge+number+delta",
+            mode="gauge+number",
             value=value,
-            domain={"x": [0, 1], "y": [0, 1]},
-            title={"text": title, "font": {"size": 20, "color": "#1f77b4"}},
-            delta={
-                "reference": 50,
-                "increasing": {"color": "red"},
-                "decreasing": {"color": "green"},
-            },
+            title={"text": title, "font": {"size": 18}},
+            number={"font": {"size": 36}},
             gauge={
-                "axis": {"range": [0, 100], "tickwidth": 2, "tickcolor": "#1f77b4"},
-                "bar": {"color": "#ff7f0e", "thickness": 0.75},
+                "axis": {"range": [0, 100]},
+                "bar": {"color": "#00cc99", "thickness": 0.75},
                 "bgcolor": "white",
                 "borderwidth": 2,
-                "bordercolor": "#1f77b4",
+                "bordercolor": "#0066cc",
                 "steps": [
                     {"range": [0, 30], "color": "#c8e6c9"},
                     {"range": [30, 70], "color": "#fff9c4"},
@@ -246,133 +191,129 @@ def create_gauge_chart(value, title="Risk Score"):
             },
         )
     )
-
-    fig.update_layout(
-        height=300,
-        margin=dict(l=20, r=20, t=50, b=20),
-        paper_bgcolor="rgba(0,0,0,0)",
-        font={"color": "#1f77b4", "family": "Arial"},
-    )
-
+    fig.update_layout(height=280, margin=dict(l=20, r=20, t=50, b=20))
     return fig
 
 
-def get_health_status(value, thresholds, labels):
-    """Get health status based on thresholds"""
-    for i, threshold in enumerate(thresholds):
-        if value < threshold:
-            return labels[i]
-    return labels[-1]
+def get_water_quality_status(params):
+    """Assess overall water quality"""
+    issues = []
 
+    if params.get("ph", 7) < 6.5 or params.get("ph", 7) > 8.5:
+        issues.append("pH abnormal")
+    if params.get("turbidity_ntu", 0) > 10:
+        issues.append("High turbidity")
+    if params.get("fecal_coliform_mpn", 0) > 10:
+        issues.append("Fecal contamination")
+    if params.get("dissolved_oxygen_mg_l", 10) < 5:
+        issues.append("Low oxygen")
+    if params.get("arsenic_ug_l", 0) > 10:
+        issues.append("Arsenic detected")
+    if params.get("nitrate_mg_l", 0) > 45:
+        issues.append("High nitrate")
 
-def export_to_excel(df):
-    """Export dataframe to Excel format"""
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="Predictions")
-    return output.getvalue()
+    if len(issues) == 0:
+        return "SAFE", "#4caf50", "✅ Water meets all safety standards"
+    elif len(issues) <= 2:
+        return "MODERATE", "#ff9800", f"⚠️ Issues found: {', '.join(issues)}"
+    else:
+        return "UNSAFE", "#f44336", f"❌ Multiple issues: {', '.join(issues)}"
 
 
 # ============================================================================
-# MAIN APPLICATION
+# MAIN APP
 # ============================================================================
 def main():
-    """Main application function"""
+    models, scalers, features, encoders, metadata, loaded = load_all_models()
 
-    # Load models
-    models, scalers, features, metadata, model_loaded = load_model_files()
-
-    if not model_loaded:
-        st.error("❌ **Model files not found!**")
-        st.info("Please run the setup script first:")
-        st.code("python create_and_train.py", language="bash")
+    if not loaded:
+        st.error("❌ **Models not found!**")
+        st.info("Please run: `python train_models.py`")
         st.stop()
 
     # Header
     st.markdown(
-        '<h1 class="main-header">🏥 Disease Risk Prediction System</h1>',
+        '<h1 class="main-header">💧 Water-Borne Disease Early Warning System</h1>',
         unsafe_allow_html=True,
     )
     st.markdown(
-        "<p style='text-align: center; font-size: 1.2rem; color: #666;'>AI-Powered Health Risk Assessment • Predicts: Diabetes, Heart Disease, Hypertension, Stroke</p>",
+        "<p style='text-align: center; font-size: 1.2rem; color: #666;'>Smart Community Health Monitoring • Northeast India</p>",
         unsafe_allow_html=True,
     )
     st.markdown("---")
 
-    # Sidebar Navigation
+    # Sidebar
     with st.sidebar:
-        st.image(
-            "https://img.icons8.com/fluency/96/000000/heart-with-pulse.png", width=100
-        )
+        st.image("https://img.icons8.com/fluency/96/water.png", width=80)
         st.markdown("## 📋 Navigation")
 
         page = st.radio(
             "",
             [
-                "🏠 Home",
-                "👤 Single Prediction",
-                "✏️ Edit & Repredict",
-                "📊 Batch Prediction",
-                "📈 Analytics",
-                "📜 History",
-                "ℹ️ About",
+                "🏠 Dashboard",
+                "🔬 Water Quality Test",
+                "📊 Batch Analysis",
+                "📈 Model Performance",
+                "📜 Test History",
+                "ℹ️ About System",
             ],
             label_visibility="collapsed",
         )
 
         st.markdown("---")
         st.markdown("### 📊 System Stats")
-        st.metric("Total Predictions", st.session_state.total_predictions)
+        st.metric("Total Tests", len(st.session_state.test_history))
+        st.metric(
+            "Active Alerts",
+            len([a for a in st.session_state.alerts if a.get("active", True)]),
+        )
+
+        # Display model accuracy
+        if metadata and "results" in metadata:
+            st.markdown("---")
+            st.markdown("### 🎯 Model Accuracy")
+            for result in metadata["results"]:
+                if result["Disease"] == "Overall":
+                    st.metric(
+                        result["Disease"],
+                        f"{result['Accuracy'] * 100:.1f}%",
+                        delta=f"F1: {result['F1-Score'] * 100:.1f}%",
+                    )
 
         st.markdown("---")
-        st.markdown("### 🎯 Diseases Monitored")
-        for disease_info in DISEASE_INFO.values():
-            st.markdown(
-                f"{disease_info['icon']} {disease_info['name'].replace(disease_info['icon'], '').strip()}"
-            )
+        st.success(f"📅 {datetime.now().strftime('%d %B %Y')}")
+        st.info("🕐 " + datetime.now().strftime("%I:%M %p"))
 
-        st.markdown("---")
-        st.info(f"📅 {datetime.now().strftime('%B %d, %Y')}")
-        st.success("✅ System Online")
-
-    # Route to pages
-    if page == "🏠 Home":
-        show_home_page()
-    elif page == "👤 Single Prediction":
-        show_single_prediction(models, scalers, features)
-    elif page == "✏️ Edit & Repredict":
-        show_edit_mode(models, scalers, features)
-    elif page == "📊 Batch Prediction":
-        show_batch_prediction(models, scalers, features)
-    elif page == "📈 Analytics":
-        show_analytics(models, features, metadata)
-    elif page == "📜 History":
-        show_history()
-    elif page == "ℹ️ About":
-        show_about()
+    # Route pages
+    if page == "🏠 Dashboard":
+        show_dashboard(metadata)
+    elif page == "🔬 Water Quality Test":
+        show_water_test(models, scalers, features, encoders)
+    elif page == "📊 Batch Analysis":
+        show_batch_analysis(models, scalers, features, encoders)
+    elif page == "📈 Model Performance":
+        show_model_performance(metadata)
+    elif page == "📜 Test History":
+        show_test_history()
+    elif page == "ℹ️ About System":
+        show_about(metadata)
 
 
 # ============================================================================
-# PAGE: HOME
+# PAGE: DASHBOARD
 # ============================================================================
-def show_home_page():
-    """Home page with overview and features"""
+def show_dashboard(metadata):
+    st.markdown("## 🏠 System Overview")
 
-    st.markdown(
-        '<h2 class="sub-header">Welcome to the Disease Risk Prediction System</h2>',
-        unsafe_allow_html=True,
-    )
-
-    # Features overview
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
         st.markdown(
             """
         <div class="metric-card">
-            <h3 style="color: #1f77b4;">🎯</h3>
-            <h4>4 Diseases</h4>
-            <p>Comprehensive analysis</p>
+            <h3 style="color: #0066cc;">💧</h3>
+            <h4>Water Quality</h4>
+            <p>Real-time monitoring</p>
         </div>
         """,
             unsafe_allow_html=True,
@@ -382,9 +323,9 @@ def show_home_page():
         st.markdown(
             """
         <div class="metric-card">
-            <h3 style="color: #ff7f0e;">⚡</h3>
-            <h4>Instant Results</h4>
-            <p>Real-time predictions</p>
+            <h3 style="color: #00cc99;">🦠</h3>
+            <h4>4 Diseases</h4>
+            <p>AI prediction models</p>
         </div>
         """,
             unsafe_allow_html=True,
@@ -394,9 +335,9 @@ def show_home_page():
         st.markdown(
             """
         <div class="metric-card">
-            <h3 style="color: #2ca02c;">📊</h3>
-            <h4>Batch Processing</h4>
-            <p>Upload CSV files</p>
+            <h3 style="color: #ff9800;">🚨</h3>
+            <h4>Early Warning</h4>
+            <p>Outbreak detection</p>
         </div>
         """,
             unsafe_allow_html=True,
@@ -406,9 +347,9 @@ def show_home_page():
         st.markdown(
             """
         <div class="metric-card">
-            <h3 style="color: #d62728;">🔒</h3>
-            <h4>100% Secure</h4>
-            <p>Privacy guaranteed</p>
+            <h3 style="color: #e91e63;">🌏</h3>
+            <h4>NE India</h4>
+            <p>7 states covered</p>
         </div>
         """,
             unsafe_allow_html=True,
@@ -416,23 +357,21 @@ def show_home_page():
 
     st.markdown("---")
 
-    # Disease cards
-    st.markdown(
-        '<h2 class="sub-header">🏥 Monitored Diseases</h2>', unsafe_allow_html=True
-    )
+    # Disease information cards
+    st.markdown("## 🦠 Monitored Water-Borne Diseases")
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2 = st.columns(2)
 
-    for col, (disease_key, disease_info) in zip(
-        [col1, col2, col3, col4], DISEASE_INFO.items()
-    ):
-        with col:
+    for idx, (disease_key, disease_info) in enumerate(DISEASES.items()):
+        with col1 if idx % 2 == 0 else col2:
             st.markdown(
                 f"""
-            <div style="background: {disease_info["color"]}15; padding: 1.5rem; border-radius: 10px;
+            <div style="background: {disease_info["color"]}10; padding: 1.5rem; border-radius: 10px;
                        border-left: 4px solid {disease_info["color"]}; margin: 0.5rem 0;">
-                <h3 style="color: {disease_info["color"]}; margin: 0;">{disease_info["icon"]} {disease_info["name"].replace(disease_info["icon"], "").strip()}</h3>
-                <p style="margin: 0.5rem 0 0 0; color: #666;">{disease_info["description"]}</p>
+                <h3 style="color: {disease_info["color"]}; margin: 0;">{disease_info["name"]}</h3>
+                <p style="margin: 0.5rem 0 0 0;"><strong>{disease_info["description"]}</strong></p>
+                <p style="margin: 0.3rem 0; font-size: 0.9rem; color: #666;"><strong>Symptoms:</strong> {disease_info["symptoms"]}</p>
+                <p style="margin: 0.3rem 0; font-size: 0.9rem; color: #666;"><strong>Prevention:</strong> {disease_info["prevention"]}</p>
             </div>
             """,
                 unsafe_allow_html=True,
@@ -440,310 +379,295 @@ def show_home_page():
 
     st.markdown("---")
 
-    # How it works
-    st.markdown('<h2 class="sub-header">🚀 How It Works</h2>', unsafe_allow_html=True)
+    # System accuracy
+    if metadata and "results" in metadata:
+        st.markdown("## 🎯 System Performance")
 
-    col1, col2, col3, col4 = st.columns(4)
+        results_df = pd.DataFrame(metadata["results"])
 
-    with col1:
-        st.markdown(
-            """
-        <div style="text-align: center; padding: 1rem;">
-            <h1 style="color: #1f77b4;">1️⃣</h1>
-            <h4>Input Data</h4>
-            <p>Enter health information</p>
-        </div>
-        """,
-            unsafe_allow_html=True,
-        )
+        col1, col2 = st.columns([2, 1])
 
-    with col2:
-        st.markdown(
-            """
-        <div style="text-align: center; padding: 1rem;">
-            <h1 style="color: #ff7f0e;">2️⃣</h1>
-            <h4>AI Analysis</h4>
-            <p>5 ML models analyze data</p>
-        </div>
-        """,
-            unsafe_allow_html=True,
-        )
+        with col1:
+            # Bar chart
+            fig = go.Figure()
+            fig.add_trace(
+                go.Bar(
+                    name="Accuracy",
+                    x=results_df["Disease"],
+                    y=results_df["Accuracy"] * 100,
+                    marker_color="#0066cc",
+                )
+            )
+            fig.add_trace(
+                go.Bar(
+                    name="F1-Score",
+                    x=results_df["Disease"],
+                    y=results_df["F1-Score"] * 100,
+                    marker_color="#00cc99",
+                )
+            )
+            fig.update_layout(
+                title="Model Performance by Disease",
+                xaxis_title="Disease",
+                yaxis_title="Score (%)",
+                barmode="group",
+                height=400,
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
-    with col3:
-        st.markdown(
-            """
-        <div style="text-align: center; padding: 1rem;">
-            <h1 style="color: #2ca02c;">3️⃣</h1>
-            <h4>Get Results</h4>
-            <p>See specific disease risks</p>
-        </div>
-        """,
-            unsafe_allow_html=True,
-        )
-
-    with col4:
-        st.markdown(
-            """
-        <div style="text-align: center; padding: 1rem;">
-            <h1 style="color: #d62728;">4️⃣</h1>
-            <h4>Take Action</h4>
-            <p>Follow recommendations</p>
-        </div>
-        """,
-            unsafe_allow_html=True,
-        )
+        with col2:
+            st.markdown("### 📊 Metrics")
+            for result in results_df.to_dict("records"):
+                st.metric(
+                    result["Disease"],
+                    f"{result['Accuracy'] * 100:.1f}%",
+                    delta=f"F1: {result['F1-Score'] * 100:.1f}%",
+                )
 
     st.markdown("---")
-
-    # Sample data
-    st.markdown('<h2 class="sub-header">📥 Sample Dataset</h2>', unsafe_allow_html=True)
-    st.write("Download sample CSV to test batch predictions:")
-
-    sample_data = pd.DataFrame(
-        {
-            "age": [45, 55, 38, 62, 50],
-            "gender": [1, 0, 1, 1, 0],
-            "bmi": [26.5, 32.1, 23.4, 29.8, 27.2],
-            "blood_pressure": [130, 155, 118, 165, 140],
-            "cholesterol": [210, 265, 185, 245, 220],
-            "blood_sugar": [105, 145, 88, 138, 112],
-            "heart_rate": [72, 88, 65, 82, 75],
-            "smoking": [0, 1, 0, 1, 0],
-            "exercise_hours": [3.5, 1.0, 6.0, 2.0, 4.0],
-            "family_history": [1, 1, 0, 1, 1],
-        }
-    )
-
-    st.dataframe(sample_data, use_container_width=True)
-
-    csv = sample_data.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        label="📥 Download Sample CSV",
-        data=csv,
-        file_name="sample_dataset.csv",
-        mime="text/csv",
-        use_container_width=True,
+    st.info(
+        "👈 **Click 'Water Quality Test'** in the sidebar to start testing water samples!"
     )
 
 
 # ============================================================================
-# PAGE: SINGLE PREDICTION
+# PAGE: WATER QUALITY TEST (MAIN FEATURE)
 # ============================================================================
-def show_single_prediction(models, scalers, features):
-    """Enhanced single prediction with specific diseases"""
+def show_water_test(models, scalers, features, encoders):
+    st.markdown("## 🔬 Water Quality Test & Disease Risk Assessment")
 
-    st.markdown(
-        '<h2 class="sub-header">👤 Single Patient Risk Assessment</h2>',
-        unsafe_allow_html=True,
-    )
+    st.info("""
+    **📋 Instructions:** Enter water quality test results below. The system will analyze the data and
+    predict outbreak risk for 4 waterborne diseases using AI/ML models.
+    """)
 
-    st.write(
-        "Enter patient health information for comprehensive disease risk assessment:"
-    )
+    with st.form("water_test_form"):
+        st.markdown("### 📍 Sample Information")
 
-    # Input form
-    with st.form("prediction_form"):
-        # Tabs for organized input
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            state = st.selectbox(
+                "State",
+                [
+                    "Assam",
+                    "Meghalaya",
+                    "Tripura",
+                    "Nagaland",
+                    "Manipur",
+                    "Mizoram",
+                    "Arunachal Pradesh",
+                ],
+            )
+            location = st.selectbox("Location Type", ["Rural", "Urban"])
+
+        with col2:
+            source = st.selectbox(
+                "Water Source",
+                ["River", "Stream", "Well", "Hand Pump", "Pond", "Spring"],
+            )
+            season = st.selectbox(
+                "Season", ["Monsoon", "Pre-Monsoon", "Post-Monsoon", "Winter"]
+            )
+
+        with col3:
+            population = st.selectbox(
+                "Population Served", [50, 100, 200, 500, 1000, 2000]
+            )
+            sanitation = st.slider("Sanitation Access (%)", 0, 100, 60, 10)
+
+        st.markdown("---")
+        st.markdown("### 🧪 Water Quality Parameters")
+
         tab1, tab2, tab3 = st.tabs(
-            ["👤 Demographics & Vitals", "🩺 Blood Tests", "🏃 Lifestyle"]
+            ["Basic Parameters", "Chemical Tests", "Biological Tests"]
         )
 
         with tab1:
             col1, col2, col3 = st.columns(3)
 
             with col1:
-                st.markdown("**Personal Information**")
-                age = st.slider("Age (years)", 20, 90, 45, help="Patient's age")
-                gender = st.selectbox(
-                    "Gender", ["Female", "Male"], help="Biological gender"
+                ph = st.number_input(
+                    "pH", 5.0, 9.0, 7.0, 0.1, help="WHO: 6.5-8.5 optimal"
                 )
-                gender_val = 1 if gender == "Male" else 0
+                turbidity = st.number_input(
+                    "Turbidity (NTU)", 0.0, 120.0, 5.0, 0.5, help="India: <10 NTU"
+                )
 
             with col2:
-                st.markdown("**Body Measurements**")
-                bmi = st.slider("BMI", 15.0, 45.0, 25.0, 0.1, help="Body Mass Index")
-                bmi_status = get_health_status(
-                    bmi,
-                    [18.5, 25, 30],
-                    ["Underweight", "Normal", "Overweight", "Obese"],
+                tds = st.number_input(
+                    "TDS (mg/L)", 50.0, 1200.0, 300.0, 10.0, help="India: <500 mg/L"
                 )
-                st.info(f"Status: {bmi_status}")
+                do = st.number_input(
+                    "Dissolved Oxygen (mg/L)", 1.0, 12.0, 6.5, 0.1, help="Good: >5 mg/L"
+                )
 
             with col3:
-                st.markdown("**Vital Signs**")
-                bp = st.slider(
-                    "Blood Pressure (mmHg)", 90, 200, 120, help="Systolic pressure"
+                bod = st.number_input(
+                    "BOD (mg/L)", 0.5, 18.0, 2.0, 0.1, help="Good: <3 mg/L"
                 )
-                bp_status = get_health_status(
-                    bp,
-                    [120, 130, 140],
-                    ["Normal", "Elevated", "High Stage 1", "High Stage 2"],
-                )
-                st.info(f"Status: {bp_status}")
-
-                hr = st.slider(
-                    "Heart Rate (bpm)", 50, 120, 72, help="Resting heart rate"
-                )
+                temp = st.number_input("Temperature (°C)", 14.0, 33.0, 25.0, 0.5)
 
         with tab2:
-            col1, col2 = st.columns(2)
+            col1, col2, col3 = st.columns(3)
 
             with col1:
-                st.markdown("**Cholesterol & Lipids**")
-                cholesterol = st.slider(
-                    "Cholesterol (mg/dL)", 120, 350, 200, help="Total cholesterol"
+                nitrate = st.number_input(
+                    "Nitrate (mg/L)", 0.0, 60.0, 10.0, 0.5, help="WHO: <50 mg/L"
                 )
-                chol_status = get_health_status(
-                    cholesterol, [200, 240], ["Desirable", "Borderline High", "High"]
+                fluoride = st.number_input(
+                    "Fluoride (mg/L)", 0.0, 3.5, 0.5, 0.1, help="India: <1.0 mg/L"
                 )
-                st.info(f"Status: {chol_status}")
 
             with col2:
-                st.markdown("**Glucose Levels**")
-                blood_sugar = st.slider(
-                    "Fasting Blood Sugar (mg/dL)", 70, 250, 100, help="Fasting glucose"
+                chloride = st.number_input(
+                    "Chloride (mg/L)", 5.0, 220.0, 30.0, 1.0, help="WHO: <250 mg/L"
                 )
-                sugar_status = get_health_status(
-                    blood_sugar, [100, 126], ["Normal", "Prediabetes", "Diabetes"]
+                hardness = st.number_input(
+                    "Hardness (mg/L)", 15.0, 280.0, 95.0, 5.0, help="Soft: <60 mg/L"
                 )
-                st.info(f"Status: {sugar_status}")
+
+            with col3:
+                arsenic = st.number_input(
+                    "Arsenic (μg/L)", 0.0, 150.0, 5.0, 0.5, help="WHO: <10 μg/L"
+                )
+                iron = st.number_input(
+                    "Iron (mg/L)", 0.0, 4.0, 0.3, 0.05, help="India: <0.3 mg/L"
+                )
 
         with tab3:
             col1, col2 = st.columns(2)
 
             with col1:
-                st.markdown("**Habits**")
-                smoking = st.selectbox("Smoking Status", ["Non-Smoker", "Smoker"])
-                smoking_val = 1 if smoking == "Smoker" else 0
-
-                exercise = st.slider(
-                    "Exercise (hours/week)",
+                fecal = st.number_input(
+                    "Fecal Coliform (MPN/100ml)",
                     0.0,
-                    20.0,
-                    3.0,
-                    0.5,
-                    help="Physical activity",
+                    800.0,
+                    10.0,
+                    1.0,
+                    help="India: <10 MPN/100ml - Critical parameter",
                 )
-                exercise_status = get_health_status(
-                    exercise, [2, 5], ["Sedentary", "Moderate", "Active"]
-                )
-                st.info(f"Activity: {exercise_status}")
 
             with col2:
-                st.markdown("**Medical History**")
-                family = st.selectbox("Family History of Disease", ["No", "Yes"])
-                family_val = 1 if family == "Yes" else 0
+                total_col = st.number_input(
+                    "Total Coliform (MPN/100ml)",
+                    0.0,
+                    2000.0,
+                    50.0,
+                    5.0,
+                    help="Should be minimal",
+                )
 
-        # Submit button
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            submitted = st.form_submit_button(
-                "🔍 Analyze All Disease Risks", use_container_width=True
-            )
-
-    # Process prediction
-    if submitted:
-        # Prepare data
-        input_data = pd.DataFrame(
-            {
-                "age": [age],
-                "gender": [gender_val],
-                "bmi": [bmi],
-                "blood_pressure": [bp],
-                "cholesterol": [cholesterol],
-                "blood_sugar": [blood_sugar],
-                "heart_rate": [hr],
-                "smoking": [smoking_val],
-                "exercise_hours": [exercise],
-                "family_history": [family_val],
-            }
+        submitted = st.form_submit_button(
+            "🔍 Analyze Water Quality & Predict Disease Risk", use_container_width=True
         )
 
-        # Ensure correct column order
-        input_data = input_data[features]
+    if submitted:
+        # Prepare test data
+        test_params = {
+            "ph": ph,
+            "turbidity_ntu": turbidity,
+            "tds_mg_l": tds,
+            "dissolved_oxygen_mg_l": do,
+            "bod_mg_l": bod,
+            "fecal_coliform_mpn": fecal,
+            "total_coliform_mpn": total_col,
+            "nitrate_mg_l": nitrate,
+            "fluoride_mg_l": fluoride,
+            "chloride_mg_l": chloride,
+            "hardness_mg_l": hardness,
+            "temperature_c": temp,
+            "arsenic_ug_l": arsenic,
+            "iron_mg_l": iron,
+            "population_served": population,
+            "sanitation_access_percent": sanitation,
+        }
+
+        # Encode categorical
+        input_encoded = {
+            "state_encoded": encoders["state"].transform([state])[0],
+            "location_type_encoded": encoders["location_type"].transform([location])[0],
+            "water_source_encoded": encoders["water_source"].transform([source])[0],
+            "season_encoded": encoders["season"].transform([season])[0],
+        }
+
+        # Create input dataframe
+        input_data = pd.DataFrame([{**input_encoded, **test_params}])[features]
 
         # Predict all diseases
         disease_predictions = {}
 
-        for disease_key in ["diabetes", "heart_disease", "hypertension", "stroke"]:
-            scaler = scalers[disease_key]
-            model = models[disease_key]
+        for disease_key in ["cholera", "typhoid", "dysentery", "hepatitis_a"]:
+            scaled = scalers[disease_key].transform(input_data)
+            pred = models[disease_key].predict(scaled)[0]
+            prob = models[disease_key].predict_proba(scaled)[0]
+            disease_predictions[disease_key] = {"risk": pred, "score": prob[1] * 100}
 
-            input_scaled = scaler.transform(input_data)
-            pred = model.predict(input_scaled)[0]
-            prob = model.predict_proba(input_scaled)[0]
+        # Overall prediction
+        overall_scaled = scalers["overall"].transform(input_data)
+        overall_pred = models["overall"].predict(overall_scaled)[0]
+        overall_prob = models["overall"].predict_proba(overall_scaled)[0]
+        overall_risk = overall_prob[1] * 100
 
-            disease_predictions[disease_key] = {
-                "risk": pred,
-                "score": prob[1] * 100,
-                "probability": prob,
-            }
-
-        # Overall risk
-        overall_scaler = scalers["disease_risk"]
-        overall_model = models["disease_risk"]
-        overall_scaled = overall_scaler.transform(input_data)
-        overall_pred = overall_model.predict(overall_scaled)[0]
-        overall_prob = overall_model.predict_proba(overall_scaled)[0]
-        overall_risk_score = overall_prob[1] * 100
-
-        # Save to session for edit mode
-        st.session_state.current_prediction = {
-            "input_data": input_data.to_dict("records")[0],
-            "disease_predictions": disease_predictions,
-            "overall_prediction": overall_pred,
-            "overall_risk_score": overall_risk_score,
-        }
+        # Water quality assessment
+        quality_status, quality_color, quality_msg = get_water_quality_status(
+            test_params
+        )
 
         # Save to history
-        st.session_state.prediction_history.append(
+        st.session_state.test_history.append(
             {
                 "timestamp": datetime.now(),
-                "age": age,
-                "gender": gender,
-                "bmi": bmi,
-                "overall_risk": "High" if overall_pred == 1 else "Low",
-                "score": f"{overall_risk_score:.1f}%",
+                "state": state,
+                "water_source": source,
+                "overall_risk": overall_risk,
+                "status": quality_status,
             }
         )
-        st.session_state.total_predictions += 1
 
-        # Display results
-        st.markdown("---")
-        st.markdown(
-            '<h2 class="sub-header">📊 Comprehensive Disease Risk Assessment</h2>',
-            unsafe_allow_html=True,
-        )
-
-        # Overall summary
+        # Check for alerts
         high_risk_count = sum(1 for p in disease_predictions.values() if p["risk"] == 1)
-
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Diseases Analyzed", "4")
-        with col2:
-            st.metric(
-                "High Risk Detected",
-                high_risk_count,
-                delta="⚠️" if high_risk_count > 0 else "✅",
-                delta_color="inverse",
+        if high_risk_count >= 2 or overall_risk > 70:
+            st.session_state.alerts.append(
+                {
+                    "timestamp": datetime.now(),
+                    "location": f"{state} - {source}",
+                    "risk_level": "HIGH",
+                    "diseases": [
+                        k for k, v in disease_predictions.items() if v["risk"] == 1
+                    ],
+                    "score": overall_risk,
+                    "active": True,
+                }
             )
-        with col3:
-            avg_risk = np.mean([p["score"] for p in disease_predictions.values()])
-            st.metric("Average Risk Score", f"{avg_risk:.1f}%")
 
-        # Overall risk box
-        st.markdown("### 🎯 Overall Health Risk")
+        # DISPLAY RESULTS
+        st.markdown("---")
+        st.markdown("## 📊 Analysis Results")
+
+        # Water quality status
+        st.markdown("### 💧 Water Quality Assessment")
+        if quality_status == "SAFE":
+            st.success(quality_msg)
+        elif quality_status == "MODERATE":
+            st.warning(quality_msg)
+        else:
+            st.error(quality_msg)
+
+        # Overall risk
+        st.markdown("---")
+        st.markdown("### 🎯 Overall Disease Outbreak Risk")
+
         col1, col2 = st.columns([2, 1])
 
         with col1:
             if overall_pred == 1:
                 st.markdown(
                     f"""
-                <div class="risk-box high-risk">
-                    <h2 style="color: #d32f2f; margin: 0;">⚠️ High Overall Risk Detected</h2>
-                    <h1 style="color: #d32f2f; margin: 10px 0;">Risk Score: {overall_risk_score:.1f}%</h1>
-                    <p style="font-size: 1.1rem;">Comprehensive medical evaluation recommended</p>
+                <div class="alert-high">
+                    <h2 style="color: #d32f2f; margin: 0;">🚨 HIGH OUTBREAK RISK DETECTED</h2>
+                    <h1 style="color: #d32f2f; margin: 0.5rem 0;">Risk Score: {overall_risk:.1f}%</h1>
+                    <p style="font-size: 1.1rem; margin: 0;">Immediate intervention required for this water source!</p>
                 </div>
                 """,
                     unsafe_allow_html=True,
@@ -751,830 +675,605 @@ def show_single_prediction(models, scalers, features):
             else:
                 st.markdown(
                     f"""
-                <div class="risk-box low-risk">
-                    <h2 style="color: #388e3c; margin: 0;">✅ Low Overall Risk</h2>
-                    <h1 style="color: #388e3c; margin: 10px 0;">Risk Score: {overall_risk_score:.1f}%</h1>
-                    <p style="font-size: 1.1rem;">Continue maintaining healthy lifestyle</p>
+                <div class="alert-low">
+                    <h2 style="color: #388e3c; margin: 0;">✅ LOW OUTBREAK RISK</h2>
+                    <h1 style="color: #388e3c; margin: 0.5rem 0;">Risk Score: {overall_risk:.1f}%</h1>
+                    <p style="font-size: 1.1rem; margin: 0;">Continue regular monitoring of water quality</p>
                 </div>
                 """,
                     unsafe_allow_html=True,
                 )
 
         with col2:
-            fig = create_gauge_chart(overall_risk_score, "Overall Risk")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(create_gauge(overall_risk), use_container_width=True)
 
-        # Individual disease breakdown
+        # Individual disease risks
         st.markdown("---")
-        st.markdown("### 🏥 Individual Disease Risk Breakdown")
+        st.markdown("### 🦠 Disease-Specific Risk Assessment")
 
-        for disease_key, disease_info in DISEASE_INFO.items():
+        col1, col2 = st.columns(2)
+
+        for idx, (disease_key, disease_info) in enumerate(DISEASES.items()):
             pred_data = disease_predictions[disease_key]
             is_high = pred_data["risk"] == 1
             score = pred_data["score"]
 
-            col1, col2 = st.columns([3, 1])
-
-            with col1:
-                status = "⚠️ HIGH RISK" if is_high else "✅ LOW RISK"
-                color = disease_info["color"]
-                bg_color = f"{color}15"
+            with col1 if idx % 2 == 0 else col2:
+                status = "HIGH RISK" if is_high else "LOW RISK"
+                bg_color = f"{disease_info['color']}15" if is_high else "#4caf5010"
+                border_color = disease_info["color"] if is_high else "#4caf50"
 
                 st.markdown(
                     f"""
-                <div style="background: {bg_color}; padding: 1.5rem; border-radius: 10px;
-                           border-left: 5px solid {color}; margin: 0.5rem 0;">
-                    <h3 style="color: {color}; margin: 0;">{disease_info["icon"]} {disease_info["name"]}</h3>
-                    <h2 style="color: {color}; margin: 0.5rem 0;">{status}</h2>
-                    <h3 style="margin: 0;">Risk Score: {score:.1f}%</h3>
-                    <p style="margin: 0.5rem 0 0 0; color: #666;">{disease_info["description"]}</p>
+                <div style="background: {bg_color}; padding: 1.2rem; border-radius: 8px;
+                           border-left: 4px solid {border_color}; margin: 0.5rem 0;">
+                    <h4 style="color: {border_color}; margin: 0;">{disease_info["name"]}</h4>
+                    <h3 style="color: {border_color}; margin: 0.3rem 0;">{status}</h3>
+                    <p style="margin: 0; font-size: 1.1rem;"><strong>Risk Score: {score:.1f}%</strong></p>
                 </div>
                 """,
                     unsafe_allow_html=True,
                 )
 
-            with col2:
-                fig = create_gauge_chart(score, "")
-                st.plotly_chart(fig, use_container_width=True)
-
         # Recommendations
         st.markdown("---")
-        st.markdown("### 💡 Personalized Health Recommendations")
+        st.markdown("### 💡 Recommended Actions")
 
         if high_risk_count >= 2:
-            high_risk_diseases = [
-                DISEASE_INFO[k]["name"]
-                for k, v in disease_predictions.items()
-                if v["risk"] == 1
-            ]
             st.error(f"""
-            **🚨 URGENT: Multiple High-Risk Conditions Detected**
+            **🚨 URGENT: Multiple Disease Risks Detected ({high_risk_count} diseases)**
 
-            **Affected Areas:** {", ".join(high_risk_diseases)}
-
-            **Immediate Actions:**
-            - Schedule urgent appointment with primary care physician
-            - Request comprehensive health screening
-            - Discuss family history with doctor
-            - Consider specialist referrals
-            - Review and adjust lifestyle immediately
+            **Immediate Actions Required:**
+            1. 🚫 **STOP using this water source immediately**
+            2. 📢 Alert all community members and local health authorities
+            3. 🏥 Set up medical screening camps for early symptom detection
+            4. 💧 Arrange alternate safe water supply (tankers/packaged water)
+            5. 🧪 Conduct comprehensive water quality re-testing
+            6. 🛡️ Implement emergency water treatment (boiling/chlorination)
+            7. 📋 Monitor community for disease symptoms daily
+            8. 🏗️ Investigate and repair water source contamination
             """)
         elif high_risk_count == 1:
-            high_disease_key = [
-                k for k, v in disease_predictions.items() if v["risk"] == 1
+            high_disease = [
+                DISEASES[k]["name"]
+                for k, v in disease_predictions.items()
+                if v["risk"] == 1
             ][0]
-            high_disease_name = DISEASE_INFO[high_disease_key]["name"]
             st.warning(f"""
-            **⚠️ High Risk for {high_disease_name}**
+            **⚠️ Single Disease Risk Detected: {high_disease}**
 
             **Recommended Actions:**
-            - Consult healthcare provider about {high_disease_name.lower()}
-            - Get relevant diagnostic tests
-            - Focus on disease-specific lifestyle changes
-            - Monitor related biomarkers regularly
-            - Consider preventive medications if recommended
+            1. 💧 **Boil all water** for drinking and cooking (minimum 1 minute)
+            2. 🧪 Conduct follow-up water testing within 48 hours
+            3. 📢 Inform community members about the risk
+            4. 🏥 Monitor for symptoms: {next(v["symptoms"] for k, v in DISEASES.items() if DISEASES[k]["name"] == high_disease)}
+            5. 🛠️ Improve water treatment and sanitation facilities
+            6. 📊 Increase testing frequency to weekly
             """)
         else:
             st.success("""
-            **✅ All Disease Assessments Show Low Risk**
+            **✅ All Disease Risks Are Low**
 
-            **Continue Healthy Practices:**
-            - Maintain current healthy lifestyle
-            - Keep regular exercise routine
-            - Continue balanced nutrition
-            - Schedule annual health checkups
-            - Stay informed about preventive care
+            **Maintenance Actions:**
+            1. ✅ Continue regular water quality testing (monthly minimum)
+            2. 🧹 Maintain cleanliness around water source
+            3. 📊 Keep detailed records of all test results
+            4. 🏥 Conduct periodic community health screenings
+            5. 📚 Provide hygiene education to community members
+            6. 🔍 Watch for seasonal changes affecting water quality
             """)
 
-        # Health metrics summary
+        # Parameter analysis
         st.markdown("---")
-        st.markdown("### 📊 Detailed Health Metrics")
+        st.markdown("### 📊 Parameter Analysis")
+
+        param_analysis = []
+
+        if ph < 6.5:
+            param_analysis.append(("pH", f"{ph:.1f}", "Too acidic", "🔴"))
+        elif ph > 8.5:
+            param_analysis.append(("pH", f"{ph:.1f}", "Too alkaline", "🔴"))
+        else:
+            param_analysis.append(("pH", f"{ph:.1f}", "Normal range", "🟢"))
+
+        if turbidity > 10:
+            param_analysis.append(
+                ("Turbidity", f"{turbidity:.1f} NTU", "Exceeds limit", "🔴")
+            )
+        else:
+            param_analysis.append(
+                ("Turbidity", f"{turbidity:.1f} NTU", "Within limit", "🟢")
+            )
+
+        if fecal > 10:
+            param_analysis.append(
+                ("Fecal Coliform", f"{fecal:.0f} MPN", "Contaminated", "🔴")
+            )
+        else:
+            param_analysis.append(("Fecal Coliform", f"{fecal:.0f} MPN", "Safe", "🟢"))
+
+        if do < 5:
+            param_analysis.append(("Dissolved Oxygen", f"{do:.1f} mg/L", "Low", "🔴"))
+        else:
+            param_analysis.append(("Dissolved Oxygen", f"{do:.1f} mg/L", "Good", "🟢"))
+
+        if arsenic > 10:
+            param_analysis.append(
+                ("Arsenic", f"{arsenic:.1f} μg/L", "Exceeds limit", "🔴")
+            )
+        else:
+            param_analysis.append(("Arsenic", f"{arsenic:.1f} μg/L", "Safe", "🟢"))
 
         col1, col2, col3, col4 = st.columns(4)
 
-        with col1:
-            st.metric("BMI", f"{bmi:.1f}", bmi_status)
-        with col2:
-            st.metric("Blood Pressure", f"{bp} mmHg", bp_status)
-        with col3:
-            st.metric("Blood Sugar", f"{blood_sugar} mg/dL", sugar_status)
-        with col4:
-            st.metric("Cholesterol", f"{cholesterol} mg/dL", chol_status)
-
-        st.info(
-            "💡 **Tip:** Go to '✏️ Edit & Repredict' page to manually adjust values and see how changes affect your disease risks!"
-        )
-
-
-# ============================================================================
-# PAGE: EDIT MODE
-# ============================================================================
-def show_edit_mode(models, scalers, features):
-    """Edit mode page with manual adjustments"""
-
-    st.markdown(
-        '<h2 class="sub-header">✏️ Edit Parameters & Repredict</h2>',
-        unsafe_allow_html=True,
-    )
-
-    if st.session_state.current_prediction is None:
-        st.warning(
-            "⚠️ No prediction available to edit. Please make a prediction first from the 'Single Prediction' page."
-        )
-        return
-
-    st.success(
-        "✅ Prediction loaded! You can now manually edit any values below and click 'Recalculate Risk' to see updated predictions."
-    )
-
-    # Display original prediction
-    orig = st.session_state.current_prediction
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("### 📋 Original Prediction")
-        st.metric("Original Overall Risk", f"{orig['overall_risk_score']:.1f}%")
-        st.metric(
-            "Risk Level", "High Risk" if orig["overall_prediction"] == 1 else "Low Risk"
-        )
-
-    with col2:
-        st.markdown("### 🎯 Original Disease Risks")
-        for disease_key, pred_data in orig["disease_predictions"].items():
-            disease_name = DISEASE_INFO[disease_key]["name"]
-            st.metric(
-                disease_name,
-                f"{pred_data['score']:.1f}%",
-                "High" if pred_data["risk"] == 1 else "Low",
-            )
-
-    st.markdown("---")
-    st.markdown('<div class="editable-section">', unsafe_allow_html=True)
-    st.markdown("### ✏️ Manually Edit Health Parameters")
-    st.markdown(
-        "*Adjust any value below and click 'Recalculate Risk' to see how it affects all disease predictions*"
-    )
-
-    # Editable form
-    with st.form("edit_form"):
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            st.markdown("**Demographics**")
-            age = st.number_input(
-                "Age", 20, 90, int(orig["input_data"]["age"]), key="edit_age"
-            )
-            gender = st.number_input(
-                "Gender (0=F, 1=M)",
-                0,
-                1,
-                int(orig["input_data"]["gender"]),
-                key="edit_gender",
-            )
-            family = st.number_input(
-                "Family History (0/1)",
-                0,
-                1,
-                int(orig["input_data"]["family_history"]),
-                key="edit_family",
-            )
-
-        with col2:
-            st.markdown("**Vitals & Labs**")
-            bmi = st.number_input(
-                "BMI", 15.0, 45.0, float(orig["input_data"]["bmi"]), 0.1, key="edit_bmi"
-            )
-            bp = st.number_input(
-                "Blood Pressure",
-                90,
-                200,
-                int(orig["input_data"]["blood_pressure"]),
-                key="edit_bp",
-            )
-            cholesterol = st.number_input(
-                "Cholesterol",
-                120,
-                350,
-                int(orig["input_data"]["cholesterol"]),
-                key="edit_chol",
-            )
-            blood_sugar = st.number_input(
-                "Blood Sugar",
-                70,
-                250,
-                int(orig["input_data"]["blood_sugar"]),
-                key="edit_sugar",
-            )
-
-        with col3:
-            st.markdown("**Other Metrics**")
-            hr = st.number_input(
-                "Heart Rate",
-                50,
-                120,
-                int(orig["input_data"]["heart_rate"]),
-                key="edit_hr",
-            )
-            smoking = st.number_input(
-                "Smoking (0/1)",
-                0,
-                1,
-                int(orig["input_data"]["smoking"]),
-                key="edit_smoke",
-            )
-            exercise = st.number_input(
-                "Exercise Hours",
-                0.0,
-                20.0,
-                float(orig["input_data"]["exercise_hours"]),
-                0.1,
-                key="edit_exercise",
-            )
-
-        recalculate = st.form_submit_button(
-            "🔄 Recalculate All Disease Risks", use_container_width=True
-        )
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    if recalculate:
-        # Create new input
-        new_input = pd.DataFrame(
-            {
-                "age": [age],
-                "gender": [gender],
-                "bmi": [bmi],
-                "blood_pressure": [bp],
-                "cholesterol": [cholesterol],
-                "blood_sugar": [blood_sugar],
-                "heart_rate": [hr],
-                "smoking": [smoking],
-                "exercise_hours": [exercise],
-                "family_history": [family],
-            }
-        )[features]
-
-        # New predictions for all diseases
-        new_disease_predictions = {}
-
-        for disease_key in ["diabetes", "heart_disease", "hypertension", "stroke"]:
-            scaler = scalers[disease_key]
-            model = models[disease_key]
-
-            new_scaled = scaler.transform(new_input)
-            new_pred = model.predict(new_scaled)[0]
-            new_prob = model.predict_proba(new_scaled)[0]
-
-            new_disease_predictions[disease_key] = {
-                "risk": new_pred,
-                "score": new_prob[1] * 100,
-            }
-
-        # New overall risk
-        overall_scaler = scalers["disease_risk"]
-        overall_model = models["disease_risk"]
-        overall_scaled = overall_scaler.transform(new_input)
-        new_overall_pred = overall_model.predict(overall_scaled)[0]
-        new_overall_prob = overall_model.predict_proba(overall_scaled)[0]
-        new_overall_risk = new_overall_prob[1] * 100
-
-        # Show comparison
-        st.markdown("---")
-        st.markdown("### 📊 Before vs After Comparison")
-
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            st.markdown("#### Original Overall Risk")
-            st.metric("Risk Score", f"{orig['overall_risk_score']:.1f}%")
-            st.metric(
-                "Risk Level", "High" if orig["overall_prediction"] == 1 else "Low"
-            )
-
-        with col2:
-            st.markdown("#### New (Edited) Overall Risk")
-            st.metric(
-                "Risk Score",
-                f"{new_overall_risk:.1f}%",
-                f"{new_overall_risk - orig['overall_risk_score']:.1f}%",
-            )
-            st.metric("Risk Level", "High" if new_overall_pred == 1 else "Low")
-
-        with col3:
-            st.markdown("#### Change")
-            change = new_overall_risk - orig["overall_risk_score"]
-            if abs(change) < 1:
-                st.info("Minimal change")
-            elif change > 0:
-                st.error(f"⬆️ Risk increased by {abs(change):.1f}%")
-            else:
-                st.success(f"⬇️ Risk decreased by {abs(change):.1f}%")
-
-        # Disease-by-disease comparison
-        st.markdown("---")
-        st.markdown("### 🏥 Individual Disease Changes")
-
-        for disease_key, disease_info in DISEASE_INFO.items():
-            orig_data = orig["disease_predictions"][disease_key]
-            new_data = new_disease_predictions[disease_key]
-
-            col1, col2, col3 = st.columns([1, 1, 1])
-
-            with col1:
-                st.markdown(f"**{disease_info['name']}**")
-            with col2:
-                st.metric("Original", f"{orig_data['score']:.1f}%")
-            with col3:
-                change = new_data["score"] - orig_data["score"]
-                st.metric("New", f"{new_data['score']:.1f}%", f"{change:+.1f}%")
-
-        # Gauges comparison
-        st.markdown("---")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("#### Original Overall Risk")
-            st.plotly_chart(
-                create_gauge_chart(orig["overall_risk_score"], "Original"),
-                use_container_width=True,
-            )
-        with col2:
-            st.markdown("#### New Overall Risk")
-            st.plotly_chart(
-                create_gauge_chart(new_overall_risk, "New"), use_container_width=True
-            )
-
-        # Update current prediction
-        st.session_state.current_prediction = {
-            "input_data": new_input.to_dict("records")[0],
-            "disease_predictions": new_disease_predictions,
-            "overall_prediction": new_overall_pred,
-            "overall_risk_score": new_overall_risk,
-        }
-
-        st.success(
-            "✅ All disease risks updated! You can continue editing and recalculating."
-        )
+        for idx, (param, value, status, icon) in enumerate(param_analysis):
+            with [col1, col2, col3, col4][idx % 4]:
+                st.markdown(
+                    f"""
+                <div class="metric-card">
+                    <h2 style="margin: 0;">{icon}</h2>
+                    <h4 style="margin: 0.5rem 0;">{param}</h4>
+                    <p style="margin: 0; font-size: 1.1rem;"><strong>{value}</strong></p>
+                    <p style="margin: 0.3rem 0; font-size: 0.9rem; color: #666;">{status}</p>
+                </div>
+                """,
+                    unsafe_allow_html=True,
+                )
 
 
 # ============================================================================
-# PAGE: BATCH PREDICTION
+# PAGE: BATCH ANALYSIS
 # ============================================================================
-def show_batch_prediction(models, scalers, features):
-    """Batch prediction from CSV upload"""
-
-    st.markdown(
-        '<h2 class="sub-header">📊 Batch Prediction from CSV</h2>',
-        unsafe_allow_html=True,
-    )
+def show_batch_analysis(models, scalers, features, encoders):
+    st.markdown("## 📊 Batch Water Quality Analysis")
 
     st.info("""
-    ### 📋 Instructions:
-    1. **Prepare your CSV** with required columns
-    2. **Upload the file** using the uploader below
-    3. **Review the data** to ensure it loaded correctly
-    4. **Click "Predict All"** to process all records
-    5. **Download results** in CSV or Excel format
+    **📋 Upload CSV file** with water quality data for multiple samples.
+    The system will process all records and provide comprehensive analysis.
     """)
 
-    # File uploader
-    uploaded_file = st.file_uploader(
-        "📂 Upload CSV File",
-        type=["csv"],
-        help="Upload a CSV file containing patient data",
-    )
+    st.markdown("### 📥 Required CSV Format")
+    st.write("Your CSV should contain these columns:")
 
-    if uploaded_file is not None:
+    required_cols = [
+        "state",
+        "location_type",
+        "water_source",
+        "season",
+        "ph",
+        "turbidity_ntu",
+        "tds_mg_l",
+        "dissolved_oxygen_mg_l",
+        "bod_mg_l",
+        "fecal_coliform_mpn",
+        "total_coliform_mpn",
+        "nitrate_mg_l",
+        "fluoride_mg_l",
+        "chloride_mg_l",
+        "hardness_mg_l",
+        "temperature_c",
+        "arsenic_ug_l",
+        "iron_mg_l",
+        "population_served",
+        "sanitation_access_percent",
+    ]
+
+    st.code(", ".join(required_cols), language="text")
+
+    uploaded_file = st.file_uploader("📂 Upload CSV File", type=["csv"])
+
+    if uploaded_file:
         try:
-            # Read CSV
             df = pd.read_csv(uploaded_file)
 
-            st.success(
-                f"✅ Successfully loaded **{len(df)}** records with **{len(df.columns)}** columns"
-            )
+            st.success(f"✅ Loaded {len(df)} water samples")
 
-            # Show preview
             with st.expander("👁️ Preview Data (First 10 rows)", expanded=True):
                 st.dataframe(df.head(10), use_container_width=True)
 
             # Check columns
-            missing_cols = set(features) - set(df.columns)
-            extra_cols = set(df.columns) - set(features)
+            missing = set(required_cols) - set(df.columns)
 
-            col1, col2 = st.columns(2)
-            with col1:
-                if missing_cols:
-                    st.error(f"❌ **Missing columns:** {', '.join(missing_cols)}")
-                else:
-                    st.success("✅ All required columns present")
+            if missing:
+                st.error(f"❌ Missing columns: {', '.join(missing)}")
+            else:
+                if st.button("🔬 Analyze All Samples", use_container_width=True):
+                    with st.spinner("Processing all water samples..."):
+                        # Encode categorical variables
+                        for col in ["state", "location_type", "water_source", "season"]:
+                            df[f"{col}_encoded"] = encoders[col].transform(df[col])
 
-            with col2:
-                if extra_cols:
-                    st.warning(
-                        f"⚠️ **Extra columns (will be ignored):** {', '.join(extra_cols)}"
-                    )
-
-            # Predict button
-            if not missing_cols:
-                if st.button(
-                    "🔮 Predict All Records (All Diseases)", use_container_width=True
-                ):
-                    with st.spinner(
-                        "🔄 Processing predictions for all diseases... Please wait."
-                    ):
-                        # Prepare data
+                        # Prepare features
                         X = df[features]
 
-                        # Predict each disease
-                        for disease_key, disease_info in DISEASE_INFO.items():
-                            scaler = scalers[disease_key]
-                            model = models[disease_key]
+                        # Predict for all diseases
+                        for disease in [
+                            "cholera",
+                            "typhoid",
+                            "dysentery",
+                            "hepatitis_a",
+                            "overall",
+                        ]:
+                            scaled = scalers[disease].transform(X)
+                            preds = models[disease].predict(scaled)
+                            probs = models[disease].predict_proba(scaled)
 
-                            X_scaled = scaler.transform(X)
-                            predictions = model.predict(X_scaled)
-                            probabilities = model.predict_proba(X_scaled)
-
-                            df[f"{disease_info['name']}_Risk"] = [
-                                "High" if p == 1 else "Low" for p in predictions
+                            df[f"{disease}_risk"] = [
+                                "High" if p == 1 else "Low" for p in preds
                             ]
-                            df[f"{disease_info['name']}_Score_%"] = [
-                                f"{prob[1] * 100:.1f}" for prob in probabilities
-                            ]
+                            df[f"{disease}_score"] = [prob[1] * 100 for prob in probs]
 
-                        # Overall risk
-                        overall_scaler = scalers["disease_risk"]
-                        overall_model = models["disease_risk"]
-                        X_overall_scaled = overall_scaler.transform(X)
-                        overall_predictions = overall_model.predict(X_overall_scaled)
-                        overall_probabilities = overall_model.predict_proba(
-                            X_overall_scaled
-                        )
+                        st.success("✅ Analysis complete!")
 
-                        df["Overall_Risk"] = [
-                            "High" if p == 1 else "Low" for p in overall_predictions
-                        ]
-                        df["Overall_Score_%"] = [
-                            f"{prob[1] * 100:.1f}" for prob in overall_probabilities
-                        ]
+                        # Summary
+                        st.markdown("### 📊 Summary Statistics")
 
-                        st.session_state.total_predictions += len(df)
+                        col1, col2, col3, col4, col5 = st.columns(5)
 
-                    st.success(
-                        "✅ **Predictions completed successfully for all diseases!**"
-                    )
-
-                    # Summary statistics
-                    st.markdown("---")
-                    st.markdown("### 📊 Prediction Summary")
-
-                    col1, col2, col3, col4, col5 = st.columns(5)
-
-                    with col1:
-                        st.metric("Total Records", len(df))
-                    with col2:
-                        diabetes_high = (
-                            df["🩸 Diabetes_Risk"].value_counts().get("High", 0)
-                        )
-                        st.metric(
-                            "Diabetes Risk",
-                            diabetes_high,
-                            f"{diabetes_high / len(df) * 100:.1f}%",
-                        )
-                    with col3:
-                        heart_high = (
-                            df["❤️ Heart Disease_Risk"].value_counts().get("High", 0)
-                        )
-                        st.metric(
-                            "Heart Disease",
-                            heart_high,
-                            f"{heart_high / len(df) * 100:.1f}%",
-                        )
-                    with col4:
-                        hyper_high = (
-                            df["💉 Hypertension_Risk"].value_counts().get("High", 0)
-                        )
-                        st.metric(
-                            "Hypertension",
-                            hyper_high,
-                            f"{hyper_high / len(df) * 100:.1f}%",
-                        )
-                    with col5:
-                        stroke_high = df["🧠 Stroke_Risk"].value_counts().get("High", 0)
-                        st.metric(
-                            "Stroke Risk",
-                            stroke_high,
-                            f"{stroke_high / len(df) * 100:.1f}%",
-                        )
-
-                    # Results table
-                    st.markdown("---")
-                    st.markdown("### 📋 Detailed Results")
-                    st.dataframe(df, use_container_width=True)
-
-                    # Visualizations
-                    st.markdown("---")
-                    st.markdown("### 📈 Visual Analysis")
-
-                    col1, col2 = st.columns(2)
-
-                    with col1:
-                        # Overall risk pie chart
-                        fig = px.pie(
-                            values=df["Overall_Risk"].value_counts().values,
-                            names=df["Overall_Risk"].value_counts().index,
-                            title="Overall Risk Distribution",
-                            color=df["Overall_Risk"].value_counts().index,
-                            color_discrete_map={"High": "#ef5350", "Low": "#66bb6a"},
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-
-                    with col2:
-                        # Disease comparison bar chart
-                        disease_counts = {
-                            "Diabetes": diabetes_high,
-                            "Heart Disease": heart_high,
-                            "Hypertension": hyper_high,
-                            "Stroke": stroke_high,
-                        }
-                        fig = px.bar(
-                            x=list(disease_counts.keys()),
-                            y=list(disease_counts.values()),
-                            title="High-Risk Cases by Disease",
-                            labels={"x": "Disease", "y": "Number of High-Risk Cases"},
-                            color=list(disease_counts.values()),
-                            color_continuous_scale="Reds",
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-
-                    # Download options
-                    st.markdown("---")
-                    st.markdown("### 📥 Download Results")
-
-                    col1, col2, col3 = st.columns(3)
-
-                    with col1:
-                        csv = df.to_csv(index=False).encode("utf-8")
-                        st.download_button(
-                            label="📄 Download as CSV",
-                            data=csv,
-                            file_name=f"disease_predictions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                            mime="text/csv",
-                            use_container_width=True,
-                        )
-
-                    with col2:
-                        excel_data = export_to_excel(df)
-                        st.download_button(
-                            label="📊 Download as Excel",
-                            data=excel_data,
-                            file_name=f"disease_predictions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            use_container_width=True,
-                        )
-
-                    with col3:
-                        high_risk_df = df[df["Overall_Risk"] == "High"]
-                        if len(high_risk_df) > 0:
-                            csv_high = high_risk_df.to_csv(index=False).encode("utf-8")
-                            st.download_button(
-                                label="⚠️ High Risk Only",
-                                data=csv_high,
-                                file_name=f"high_risk_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                                mime="text/csv",
-                                use_container_width=True,
+                        with col1:
+                            st.metric("Total Samples", len(df))
+                        with col2:
+                            cholera_high = (df["cholera_risk"] == "High").sum()
+                            st.metric(
+                                "Cholera Risk",
+                                cholera_high,
+                                f"{cholera_high / len(df) * 100:.1f}%",
+                            )
+                        with col3:
+                            typhoid_high = (df["typhoid_risk"] == "High").sum()
+                            st.metric(
+                                "Typhoid Risk",
+                                typhoid_high,
+                                f"{typhoid_high / len(df) * 100:.1f}%",
+                            )
+                        with col4:
+                            dysentery_high = (df["dysentery_risk"] == "High").sum()
+                            st.metric(
+                                "Dysentery Risk",
+                                dysentery_high,
+                                f"{dysentery_high / len(df) * 100:.1f}%",
+                            )
+                        with col5:
+                            hepatitis_high = (df["hepatitis_a_risk"] == "High").sum()
+                            st.metric(
+                                "Hepatitis A Risk",
+                                hepatitis_high,
+                                f"{hepatitis_high / len(df) * 100:.1f}%",
                             )
 
+                        # Results table
+                        st.markdown("### 📋 Detailed Results")
+                        st.dataframe(df, use_container_width=True)
+
+                        # Visualizations
+                        st.markdown("### 📈 Risk Analysis Charts")
+
+                        col1, col2 = st.columns(2)
+
+                        with col1:
+                            # Overall risk pie chart
+                            overall_counts = df["overall_risk"].value_counts()
+                            fig = px.pie(
+                                values=overall_counts.values,
+                                names=overall_counts.index,
+                                title="Overall Risk Distribution",
+                                color=overall_counts.index,
+                                color_discrete_map={
+                                    "High": "#f44336",
+                                    "Low": "#4caf50",
+                                },
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+
+                        with col2:
+                            # Disease-wise comparison
+                            disease_high = {
+                                "Cholera": cholera_high,
+                                "Typhoid": typhoid_high,
+                                "Dysentery": dysentery_high,
+                                "Hepatitis A": hepatitis_high,
+                            }
+                            fig = px.bar(
+                                x=list(disease_high.keys()),
+                                y=list(disease_high.values()),
+                                title="High-Risk Cases by Disease",
+                                labels={"x": "Disease", "y": "Number of Cases"},
+                                color=list(disease_high.values()),
+                                color_continuous_scale="Reds",
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+
+                        # Download results
+                        st.markdown("### 📥 Download Results")
+
+                        csv = df.to_csv(index=False).encode("utf-8")
+                        st.download_button(
+                            "📄 Download Full Results CSV",
+                            csv,
+                            f"water_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                            "text/csv",
+                            use_container_width=True,
+                        )
+
         except Exception as e:
-            st.error(f"❌ **Error processing file:** {str(e)}")
-            st.info(
-                "Please ensure your CSV file is properly formatted with the required columns."
-            )
+            st.error(f"Error processing file: {str(e)}")
 
 
 # ============================================================================
-# PAGE: ANALYTICS
+# PAGE: MODEL PERFORMANCE
 # ============================================================================
-def show_analytics(models, features, metadata):
-    """Model analytics and performance page"""
+def show_model_performance(metadata):
+    st.markdown("## 📈 Model Performance & Accuracy")
 
-    st.markdown(
-        '<h2 class="sub-header">📈 Model Analytics & Performance</h2>',
-        unsafe_allow_html=True,
-    )
+    if not metadata or "results" not in metadata:
+        st.warning("No performance data available")
+        return
 
-    # Model info for each disease
-    st.markdown("### 🎯 Disease-Specific Model Performance")
+    results_df = pd.DataFrame(metadata["results"])
 
-    if "results" in metadata:
-        results_df = pd.DataFrame(metadata["results"])
+    # Overall statistics
+    st.markdown("### 📊 Overall Performance Metrics")
 
-        # Display as table
-        st.dataframe(results_df, use_container_width=True)
+    col1, col2, col3, col4, col5 = st.columns(5)
 
-        # Visualization
+    avg_acc = results_df["Accuracy"].mean()
+    avg_prec = results_df["Precision"].mean()
+    avg_rec = results_df["Recall"].mean()
+    avg_f1 = results_df["F1-Score"].mean()
+    avg_auc = results_df["ROC-AUC"].mean()
+
+    with col1:
+        st.metric("Avg Accuracy", f"{avg_acc * 100:.2f}%")
+    with col2:
+        st.metric("Avg Precision", f"{avg_prec * 100:.2f}%")
+    with col3:
+        st.metric("Avg Recall", f"{avg_rec * 100:.2f}%")
+    with col4:
+        st.metric("Avg F1-Score", f"{avg_f1 * 100:.2f}%")
+    with col5:
+        st.metric("Avg ROC-AUC", f"{avg_auc:.3f}")
+
+    # Performance table
+    st.markdown("### 📋 Detailed Performance by Disease")
+
+    display_df = results_df.copy()
+    for col in ["Accuracy", "Precision", "Recall", "F1-Score"]:
+        display_df[col] = display_df[col].apply(lambda x: f"{x * 100:.2f}%")
+    display_df["ROC-AUC"] = display_df["ROC-AUC"].apply(lambda x: f"{x:.4f}")
+
+    st.dataframe(display_df, use_container_width=True)
+
+    # Charts
+    st.markdown("### 📊 Performance Visualizations")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        # Grouped bar chart
         fig = go.Figure()
 
-        for metric in ["Accuracy", "Precision", "Recall", "F1-Score"]:
+        metrics = ["Accuracy", "Precision", "Recall", "F1-Score"]
+        colors = ["#0066cc", "#00cc99", "#ff9800", "#e91e63"]
+
+        for metric, color in zip(metrics, colors):
             fig.add_trace(
                 go.Bar(
                     name=metric,
                     x=results_df["Disease"],
-                    y=results_df[metric],
-                    text=results_df[metric].apply(lambda x: f"{x:.3f}"),
-                    textposition="auto",
+                    y=results_df[metric] * 100,
+                    marker_color=color,
                 )
             )
 
         fig.update_layout(
-            title="Model Performance Metrics by Disease",
+            title="Model Metrics Comparison",
             xaxis_title="Disease",
-            yaxis_title="Score",
+            yaxis_title="Score (%)",
             barmode="group",
-            height=500,
+            height=400,
         )
-
         st.plotly_chart(fig, use_container_width=True)
 
+    with col2:
+        # ROC-AUC radar chart
+        fig = go.Figure()
+
+        fig.add_trace(
+            go.Scatterpolar(
+                r=results_df["ROC-AUC"] * 100,
+                theta=results_df["Disease"],
+                fill="toself",
+                name="ROC-AUC Score",
+            )
+        )
+
+        fig.update_layout(
+            polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+            showlegend=True,
+            title="ROC-AUC Scores by Disease",
+            height=400,
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    # Model info
     st.markdown("---")
+    st.markdown("### ℹ️ Model Information")
 
-    # Feature importance for disease_risk model
-    if hasattr(models["disease_risk"], "feature_importances_"):
-        st.markdown("### 🎯 Feature Importance Analysis")
+    col1, col2, col3 = st.columns(3)
 
-        importance_df = pd.DataFrame(
-            {
-                "Feature": features,
-                "Importance": models["disease_risk"].feature_importances_,
-            }
-        ).sort_values("Importance", ascending=False)
+    with col1:
+        st.info(f"""
+        **Model Type**
+        {metadata.get("model_type", "XGBoost Classifier")}
+        """)
 
-        col1, col2 = st.columns([2, 1])
+    with col2:
+        st.info(f"""
+        **Training Date**
+        {metadata.get("training_date", "N/A")}
+        """)
 
-        with col1:
-            fig = px.bar(
-                importance_df,
-                x="Importance",
-                y="Feature",
-                orientation="h",
-                title="Feature Importance Ranking",
-                color="Importance",
-                color_continuous_scale="Viridis",
-            )
-            fig.update_layout(height=500)
-            st.plotly_chart(fig, use_container_width=True)
-
-        with col2:
-            fig = px.pie(
-                importance_df.head(5),
-                values="Importance",
-                names="Feature",
-                title="Top 5 Features",
-            )
-            st.plotly_chart(fig, use_container_width=True)
+    with col3:
+        st.info(f"""
+        **Dataset Size**
+        {metadata.get("dataset_size", "N/A"):,} records
+        """)
 
 
 # ============================================================================
-# PAGE: HISTORY
+# PAGE: TEST HISTORY
 # ============================================================================
-def show_history():
-    """Prediction history page"""
+def show_test_history():
+    st.markdown("## 📜 Water Quality Test History")
 
-    st.markdown(
-        '<h2 class="sub-header">📜 Prediction History</h2>', unsafe_allow_html=True
-    )
-
-    if st.session_state.prediction_history:
-        df = pd.DataFrame(st.session_state.prediction_history)
-
-        st.metric("Total Predictions in History", len(df))
-
-        st.markdown("### 📋 Recent Predictions")
-        st.dataframe(
-            df.sort_values("timestamp", ascending=False), use_container_width=True
-        )
-
-        st.markdown("---")
-        st.markdown("### 📊 History Analytics")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            risk_counts = df["overall_risk"].value_counts()
-            fig = px.pie(
-                values=risk_counts.values,
-                names=risk_counts.index,
-                title="Historical Risk Distribution",
-                color=risk_counts.index,
-                color_discrete_map={"High": "#ef5350", "Low": "#66bb6a"},
-            )
-            st.plotly_chart(fig, use_container_width=True)
-
-        with col2:
-            if "age" in df.columns:
-                fig = px.histogram(
-                    df,
-                    x="age",
-                    color="overall_risk",
-                    title="Age Distribution by Risk Level",
-                    nbins=15,
-                    color_discrete_map={"High": "#ef5350", "Low": "#66bb6a"},
-                )
-                st.plotly_chart(fig, use_container_width=True)
-
-        # Clear history button
-        st.markdown("---")
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col2:
-            if st.button("🗑️ Clear All History", use_container_width=True):
-                st.session_state.prediction_history = []
-                st.session_state.total_predictions = 0
-                st.success("✅ History cleared!")
-                st.rerun()
-    else:
+    if not st.session_state.test_history:
         st.info(
-            "📭 No prediction history available yet. Make some predictions to see them here!"
+            "No test history available yet. Conduct some water quality tests to see them here!"
         )
+        return
+
+    df = pd.DataFrame(st.session_state.test_history)
+
+    st.metric("Total Tests Conducted", len(df))
+
+    # Display history
+    st.markdown("### 📊 Recent Tests")
+    st.dataframe(df.sort_values("timestamp", ascending=False), use_container_width=True)
+
+    # Analytics
+    st.markdown("### 📈 History Analytics")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        # Risk distribution
+        fig = px.histogram(
+            df,
+            x="overall_risk",
+            title="Risk Score Distribution",
+            labels={"overall_risk": "Risk Score (%)"},
+            nbins=20,
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        # State distribution
+        state_counts = df["state"].value_counts()
+        fig = px.pie(
+            values=state_counts.values, names=state_counts.index, title="Tests by State"
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    # Clear history
+    if st.button("🗑️ Clear All History"):
+        st.session_state.test_history = []
+        st.success("History cleared!")
+        st.rerun()
 
 
 # ============================================================================
 # PAGE: ABOUT
 # ============================================================================
-def show_about():
-    """About page with system information"""
-
-    st.markdown(
-        '<h2 class="sub-header">ℹ️ About This System</h2>', unsafe_allow_html=True
-    )
+def show_about(metadata):
+    st.markdown("## ℹ️ About the System")
 
     st.markdown("""
-    ## Multi-Disease Risk Prediction System
+    ### Smart Community Health Monitoring and Early Warning System
 
-    A comprehensive AI-powered platform for assessing disease risk based on patient health parameters.
+    **For Water-Borne Diseases in Rural Northeast India**
 
-    ### 🎯 Diseases Monitored:
-
-    1. **🩸 Diabetes** - Blood sugar regulation disorder
-    2. **❤️ Heart Disease** - Cardiovascular system disorder
-    3. **💉 Hypertension** - High blood pressure
-    4. **🧠 Stroke** - Brain blood flow blockage
-
-    ### ✨ Key Features:
-
-    - **Multi-Disease Analysis**: Simultaneous prediction for 4 major diseases
-    - **High Accuracy**: 95%+ prediction accuracy using XGBoost algorithm
-    - **Real-time Results**: Instant risk assessment in under 1 second
-    - **Batch Processing**: Upload and analyze multiple patient records
-    - **Editable Predictions**: Manually adjust parameters to see impact
-    - **Comprehensive Metrics**: 10 health parameters analyzed
-    - **Interactive Visualizations**: Beautiful charts and gauges
-    - **History Tracking**: Keep track of all predictions
-    - **Export Options**: Download results in CSV or Excel
-
-    ### 🛠️ Technology Stack:
-
-    - **Frontend**: Streamlit (Python web framework)
-    - **ML Models**: XGBoost Classifiers (5 models)
-    - **Data Processing**: Pandas, NumPy
-    - **Visualization**: Plotly, Plotly Express
-    - **Model Training**: Scikit-learn, Imbalanced-learn
-
-    ### 📊 Model Information:
-
-    - **Algorithms**: Extreme Gradient Boosting (XGBoost)
-    - **Training Dataset**: 5,000 patient records
-    - **Features**: 10 health parameters
-    - **Models Trained**: 5 (one for each disease + overall)
-
-    ### ⚠️ Important Disclaimer:
-
-    **This system is designed for educational and informational purposes only.**
-
-    - Not a substitute for professional medical advice, diagnosis, or treatment
-    - Always consult qualified healthcare providers for medical concerns
-    - Do not use this tool to make medical decisions
-    - Results should be validated by medical professionals
-
-    ### 📧 Support & Contact:
-
-    For questions, feedback, or technical support:
-    - Email: support@healthrisk.ai
-    - Documentation: [User Guide]
-    - GitHub: [Source Code]
-
-    ### 📝 Version Information:
-
-    - **Version**: 2.0.0 (Multi-Disease Edition)
-    - **Release Date**: October 2025
-    - **Last Updated**: {datetime.now().strftime('%B %d, %Y')}
-    - **License**: MIT License
+    This AI-powered system helps communities monitor water quality and predict outbreak risks
+    for four major waterborne diseases affecting Northeast India.
 
     ---
 
-    **Developed with ❤️ using Streamlit and Python**
+    ### 🎯 Key Features
+
+    ✅ **Real-time Water Quality Analysis** - Test water samples instantly
+    ✅ **AI Disease Prediction** - Predict 4 waterborne diseases using ML
+    ✅ **Early Warning Alerts** - Get outbreak warnings before they spread
+    ✅ **Batch Processing** - Analyze multiple water samples at once
+    ✅ **Performance Tracking** - View model accuracy and metrics
+    ✅ **Test History** - Track all water quality tests over time
+
+    ---
+
+    ### 🦠 Monitored Diseases
+
+    1. **Cholera** - Acute diarrheal infection (Vibrio cholerae)
+    2. **Typhoid** - Bacterial infection (Salmonella typhi)
+    3. **Dysentery** - Intestinal inflammation causing bloody diarrhea
+    4. **Hepatitis A** - Viral liver infection
+
+    ---
+
+    ### 🛠️ Technology Stack
+
+    - **Machine Learning**: XGBoost Classifier
+    - **Frontend**: Streamlit
+    - **Data Processing**: Pandas, NumPy
+    - **Visualization**: Plotly
+    - **Class Balancing**: SMOTE
+
+    ---
+
+    ### 📊 System Performance
     """)
+
+    if metadata and "results" in metadata:
+        results_df = pd.DataFrame(metadata["results"])
+        avg_acc = results_df["Accuracy"].mean() * 100
+
+        st.success(f"""
+        **Average Model Accuracy: {avg_acc:.2f}%**
+
+        Trained on {metadata.get("dataset_size", "N/A"):,} water quality records from Northeast India.
+        """)
+
+    st.markdown(
+        """
+    ---
+
+    ### ⚠️ Important Disclaimer
+
+    This system is designed as a **decision support tool** for community health workers and
+    water quality monitoring. It should **NOT** replace professional laboratory testing or
+    medical diagnosis.
+
+    **Always consult:**
+    - Certified water testing laboratories for official results
+    - Healthcare professionals for medical concerns
+    - Local health authorities for outbreak management
+
+    ---
+
+    ### 📧 Contact & Support
+
+    For technical support, training, or deployment assistance:
+    - Email: support@waterhealth.gov.in
+    - Emergency: 1800-XXX-XXXX (Toll-free)
+
+    ---
+
+    ### 📝 Version Information
+
+    - **Version**: 1.0.0
+    - **Release Date**: October 2025
+    - **Last Updated**: """
+        + datetime.now().strftime("%B %d, %Y")
+        + """
+    - **Region**: Northeast India (7 states)
+    - **Languages**: English
+
+    ---
+
+    **Developed for rural communities of Northeast India** 🌏💧
+    """
+    )
 
 
 # ============================================================================
-# RUN APPLICATION
+# RUN APP
 # ============================================================================
 if __name__ == "__main__":
     main()
