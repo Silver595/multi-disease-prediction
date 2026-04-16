@@ -41,7 +41,7 @@ os.makedirs("reports", exist_ok=True)
 # ============================================================================
 print("\n[1/4] Loading Dataset...")
 
-df = pd.read_csv("data/raw/water_quality_diseases.csv")
+df = pd.read_csv("data/raw/water_quality_data.csv")
 df["sample_date"] = pd.to_datetime(df["sample_date"])
 
 print(f"✓ Loaded {len(df):,} records")
@@ -240,7 +240,7 @@ metadata = {
     "results": disease_results,
 }
 
-with open("models/model_metadata.json", "w") as f:
+with open("models/metadata.json", "w") as f:
     json.dump(metadata, f, indent=4)
 
 # Save results
