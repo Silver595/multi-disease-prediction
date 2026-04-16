@@ -29,6 +29,10 @@ multi-disease-prediction/
 ## 🚀 Setup & Run
 
 ```bash
+# 0. Clone the Repo
+git clone https://github.com/Silver595/multi-disease-prediction.git
+cd multi-disease-prediction
+
 # 1. Create virtual environment
 python -m venv venv
 venv\Scripts\activate        # Windows
